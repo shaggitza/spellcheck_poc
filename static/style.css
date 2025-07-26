@@ -1,0 +1,606 @@
+body {
+    margin: 0;
+    padding: 0;
+    background-color: #f8f9fa;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* Word-based editor structure */
+.word-token {
+    /* Make word spans seamless - no visual indication they're separate elements */
+    display: inline;
+    border: none;
+    background: transparent;
+    margin: 0;
+    padding: 0;
+    font: inherit;
+    color: inherit;
+    text-decoration: inherit;
+}
+
+.word-token.spell-error {
+    /* Only spell errors get visual styling */
+    background-color: rgba(255, 0, 0, 0.1);
+    border-bottom: 2px wavy #ff0000;
+    cursor: pointer;
+}
+
+/* Precise spell error highlighting within word tokens */
+.spell-error-highlight {
+    background-color: rgba(255, 0, 0, 0.2) !important;
+    border-bottom: 2px wavy #ff0000 !important;
+    cursor: pointer !important;
+    display: inline !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+/* Error count badge for paragraphs */
+.error-count-badge {
+    position: absolute;
+    right: 10px;
+    top: 5px;
+    background: #dc3545 !important;
+    color: white !important;
+    font-size: 11px !important;
+    padding: 2px 6px !important;
+    border-radius: 10px !important;
+    font-weight: 500 !important;
+    z-index: 10 !important;
+    user-select: none !important;
+    pointer-events: none !important;
+    opacity: 0.8;
+    transition: opacity 0.2s ease;
+}
+
+.error-count-badge:hover {
+    opacity: 1;
+}
+
+.sidebar {
+    background-color: #343a40;
+    color: white;
+    min-height: 100vh;
+    padding: 0;
+}
+
+.sidebar h4 {
+    color: #ffc107;
+    padding: 0 15px;
+}
+
+.sidebar .form-control {
+    margin: 0 15px;
+    width: calc(100% - 30px);
+}
+
+.sidebar .btn {
+    margin-left: 15px;
+}
+
+.sidebar .list-group {
+    margin: 15px;
+}
+
+.sidebar .list-group-item {
+    background-color: #495057;
+    border-color: #6c757d;
+    color: white;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.sidebar .list-group-item:hover {
+    background-color: #6c757d;
+}
+
+.sidebar .list-group-item.active {
+    background-color: #007bff;
+    border-color: #007bff;
+}
+
+.editor-container {
+    padding: 20px;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.editor-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.editor-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.editor-wrapper {
+    position: relative;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Rich text editor styles */
+.editor-rich-text {
+    flex: 1;
+    font-family: 'JetBrains Mono', 'Fira Code', 'Source Code Pro', 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 16px;
+    line-height: 1.5;
+    font-weight: 400;
+    letter-spacing: 0;
+    border: 1px solid #ced4da;
+    padding: 20px;
+    background-color: white;
+    overflow-y: auto;
+    min-height: 400px;
+    outline: none;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.editor-rich-text:focus {
+    border-color: #80bdff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.editor-rich-text[contenteditable="false"] {
+    background-color: #f8f9fa;
+    color: #6c757d;
+    cursor: not-allowed;
+}
+
+.editor-rich-text[contenteditable="false"]:before {
+    content: attr(data-placeholder);
+    color: #6c757d;
+    font-style: italic;
+}
+
+.editor-rich-text[contenteditable="true"]:empty:before {
+    content: "Start typing your content...";
+    color: #6c757d;
+    font-style: italic;
+}
+
+/* Dashboard content styles */
+.dashboard-content {
+    padding: 40px 20px;
+    text-align: center;
+    color: #495057;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.dashboard-content h2 {
+    color: #007bff;
+    margin-bottom: 20px;
+    font-weight: 300;
+}
+
+.dashboard-content p {
+    font-size: 16px;
+    line-height: 1.6;
+    margin-bottom: 20px;
+}
+
+.dashboard-stats {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 20px;
+    margin-top: 30px;
+    border-left: 4px solid #007bff;
+}
+
+.dashboard-stats p {
+    margin: 0;
+    font-style: italic;
+    color: #6c757d;
+}
+
+/* Paragraph styling */
+.editor-rich-text p {
+    margin: 0 0 1em 0;
+    padding: 8px 12px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    position: relative;
+    min-height: 1.2em;
+}
+
+.editor-rich-text p:hover {
+    background-color: #f8f9fa;
+    border-left: 3px solid #007bff;
+    padding-left: 9px;
+}
+
+.editor-rich-text p.active-paragraph {
+    background-color: #e3f2fd;
+    border-left: 3px solid #2196f3;
+    padding-left: 9px;
+}
+
+/* Paragraph actions toolbar */
+.paragraph-actions {
+    position: absolute;
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 1001;
+    padding: 4px;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 2px;
+}
+
+.action-btn {
+    background: transparent;
+    border: none;
+    padding: 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    color: #6c757d;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.action-btn:hover {
+    background-color: #f8f9fa;
+    color: #495057;
+    transform: translateY(-1px);
+}
+
+.delete-btn:hover {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+.rewrite-btn:hover {
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+.expand-btn:hover {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.summarize-btn:hover {
+    background-color: #cce5ff;
+    color: #004085;
+}
+
+.improve-btn:hover {
+    background-color: #e2e3e5;
+    color: #383d41;
+}
+
+/* Legacy textarea styles (keeping for backwards compatibility) */
+.editor-textarea {
+    flex: 1;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    border: 1px solid #ced4da;
+    resize: none;
+    padding: 15px;
+    background-color: white;
+}
+
+.editor-textarea:focus {
+    border-color: #80bdff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+/* Inline suggestion styles */
+.inline-suggestion-text {
+    /* Inherit exact same font properties as editor */
+    font-family: 'JetBrains Mono', 'Fira Code', 'Source Code Pro', 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 16px;
+    line-height: 1.5;
+    font-weight: 400;
+    letter-spacing: 0;
+    
+    /* Suggestion-specific styling */
+    color: #9ca3af !important;
+    font-style: italic;
+    pointer-events: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    position: relative;
+    cursor: default;
+    outline: none;
+    border: none !important;
+    background: transparent !important;
+    text-decoration: none !important;
+    
+    /* Ensure no additional spacing/margin */
+    margin: 0;
+    padding: 0;
+    vertical-align: baseline;
+    
+    /* Force override any inherited styles */
+    box-shadow: none !important;
+    border-bottom: none !important;
+    border-top: none !important;
+    border-left: none !important;
+    border-right: none !important;
+}
+
+.inline-suggestion-text::before {
+    content: attr(data-suggestion);
+    position: absolute;
+    left: 0;
+    top: 0;
+    white-space: pre;
+    z-index: 1;
+}
+
+.prediction-display {
+    background-color: #e3f2fd;
+    border: 1px solid #bbdefb;
+    border-top: none;
+    padding: 10px 15px;
+    font-size: 13px;
+    color: #1976d2;
+}
+
+.prediction-text {
+    font-family: 'Courier New', Courier, monospace;
+    font-weight: 500;
+    color: #0d47a1;
+}
+
+.connection-status {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    padding: 8px 15px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+}
+
+.connection-status.connected {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.connection-status.disconnected {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.connection-status.connecting {
+    background-color: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeaa7;
+}
+
+.editor-actions {
+    display: flex;
+    align-items: center;
+}
+
+#saveStatus {
+    font-size: 12px;
+}
+
+#saveStatus.saving {
+    color: #ffc107 !important;
+}
+
+#saveStatus.saved {
+    color: #28a745 !important;
+}
+
+#saveStatus.error {
+    color: #dc3545 !important;
+}
+
+/* Spell checking styles */
+/* Old spell-error styles removed - now using .word-token.spell-error above */
+
+.spell-suggestions {
+    font-family: 'JetBrains Mono', 'Fira Code', 'Source Code Pro', 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 14px;
+    line-height: 1.4;
+    background: white;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 1000;
+    max-width: 200px;
+}
+
+.spell-suggestion-option {
+    padding: 6px 12px;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: background-color 0.15s ease;
+}
+
+.spell-suggestion-option:hover {
+    background-color: #e3f2fd !important;
+}
+
+.spell-suggestion-option:last-child {
+    font-style: italic;
+    color: #666;
+}
+
+.spell-suggestion-option:last-child:hover {
+    background-color: #e8f5e8 !important;
+}
+
+/* Enhanced Spell Suggestions Menu */
+.spell-suggestions {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.spell-suggestions::-webkit-scrollbar {
+    width: 6px;
+}
+
+.spell-suggestions::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+.spell-suggestions::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+}
+
+.spell-suggestions::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
+/* Dictionary Management Styles */
+.dictionary-container {
+    max-height: 400px;
+    overflow-y: auto;
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    background-color: #f8f9fa;
+}
+
+.dictionary-words {
+    padding: 0;
+}
+
+.dictionary-word {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 15px;
+    border-bottom: 1px solid #e9ecef;
+    background-color: white;
+    transition: background-color 0.15s ease;
+}
+
+.dictionary-word:last-child {
+    border-bottom: none;
+}
+
+.dictionary-word:hover {
+    background-color: #f8f9fa;
+}
+
+.dictionary-word-info {
+    flex-grow: 1;
+}
+
+.dictionary-word-text {
+    font-weight: 500;
+    margin-bottom: 0;
+}
+
+.dictionary-word-date {
+    font-size: 0.875rem;
+    color: #6c757d;
+    margin: 0;
+}
+
+.dictionary-word-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.btn-remove-word {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+    border-radius: 0.25rem;
+    border: 1px solid #dc3545;
+    background-color: transparent;
+    color: #dc3545;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.btn-remove-word:hover {
+    background-color: #dc3545;
+    color: white;
+}
+
+.settings-section {
+    margin-bottom: 2rem;
+}
+
+.settings-section h6 {
+    color: #495057;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+}
+
+/* Dashboard styles */
+.dashboard-content {
+    padding: 40px;
+    text-align: center;
+    color: #495057;
+}
+
+.dashboard-content h2 {
+    color: #28a745;
+    margin-bottom: 20px;
+}
+
+.dashboard-content p {
+    font-size: 16px;
+    margin-bottom: 20px;
+}
+
+.dashboard-stats {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 20px;
+    margin-top: 30px;
+    text-align: left;
+}
+
+.dashboard-stats ul {
+    list-style: none;
+    padding: 0;
+}
+
+.dashboard-stats li {
+    padding: 5px 0;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.dashboard-stats li:last-child {
+    border-bottom: none;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .sidebar {
+        min-height: auto;
+    }
+    
+    .editor-container {
+        height: auto;
+        min-height: 60vh;
+    }
+    
+    .dashboard-content {
+        padding: 20px;
+    }
+}
