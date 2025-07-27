@@ -10,7 +10,7 @@ Before running any linting or formatting commands, make sure to install the requ
 # Install frontend dependencies
 npm install
 
-# Install backend dependencies  
+# Install backend dependencies
 pip install -r requirements-dev.txt
 ```
 
