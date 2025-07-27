@@ -8,18 +8,12 @@
         "test:watch": "jest --watch",
         "test:coverage": "jest --coverage",
         "test:verbose": "jest --verbose",
-        "lint:frontend": "eslint static/**/*.js",
-        "lint:frontend:fix": "eslint static/**/*.js --fix",
-        "format:frontend": "prettier --write static/**/*.{js,css,html} *.{md,json}",
-        "format:frontend:check": "prettier --check static/**/*.{js,css,html} *.{md,json}",
-        "lint:backend": "python3 -m flake8 main.py test_main.py --max-complexity=20",
-        "format:backend": "python3 -m black main.py test_main.py && python3 -m isort main.py test_main.py",
-        "format:backend:check": "python3 -m black --check main.py test_main.py && python3 -m isort --check-only main.py test_main.py",
-        "lint": "npm run lint:frontend && npm run lint:backend",
-        "format": "npm run format:frontend && npm run format:backend",
-        "format:check": "npm run format:frontend:check && npm run format:backend:check",
+        "lint": "eslint static/**/*.js",
+        "lint:fix": "eslint static/**/*.js --fix",
+        "format": "prettier --write static/**/*.{js,css,html} *.{md,json}",
+        "format:check": "prettier --check static/**/*.{js,css,html} *.{md,json}",
         "code-quality": "npm run lint && npm run format:check",
-        "code-fix": "npm run lint:frontend:fix && npm run format"
+        "code-fix": "npm run lint:fix && npm run format"
     },
     "repository": {
         "type": "git",

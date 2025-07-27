@@ -1,0 +1,13 @@
+node_modules/
+*.min.js
+*.min.css
+__pycache__/
+*.pyc
+.git/
+.vscode/
+dist/
+build/
+coverage/
+*.log
+package-lock.json
+.prettierrc.json
