@@ -12,29 +12,29 @@ class SpellChecker {
         this.errorHandler = dependencies.errorHandler;
         this.environment = dependencies.environment;
         this.config = dependencies.config;
-        
+
         // WebSocket and connection management
         this.getWebSocket = dependencies.getWebSocket || dependencies.websocket;
         this.getConnectionState = dependencies.getConnectionState;
-        
+
         // Editor content and cursor management
         this.getEditorContent = dependencies.getEditorContent;
         this.getCursorPosition = dependencies.getCursorPosition;
         this.setCursorPosition = dependencies.setCursorPosition;
         this.updateEditorContent = dependencies.updateEditorContent;
         this.getTextEditor = dependencies.getTextEditor;
-        
+
         // State management callbacks
         this.getIsTyping = dependencies.getIsTyping;
         this.getSuggestionVisible = dependencies.getSuggestionVisible;
-        
+
         // FileManager integration
         this.fileManager = dependencies.fileManager;
-        
+
         // Timeout management
         this.setTimeoutSafe = dependencies.setTimeoutSafe;
         this.clearTimeoutSafe = dependencies.clearTimeoutSafe;
-        
+
         // UI callbacks
         this.showSpinner = dependencies.showSpinner;
         this.hideSpinner = dependencies.hideSpinner;
@@ -48,7 +48,7 @@ class SpellChecker {
         // Text change and dictionary management
         this.handleTextChange = dependencies.handleTextChange;
         this.addWordToDictionaryCallback = dependencies.addWordToDictionary;
-        
+
         // State initialization
         this.isChecking = false;
         this.currentErrors = [];
@@ -59,14 +59,14 @@ class SpellChecker {
         this.settings = {
             enableAutoCheck: true,
             checkInterval: 1000,
-            maxSuggestions: 5
+            maxSuggestions: 5,
         };
 
         // Legacy state (for compatibility)
         this.spellErrors = {};
         this.spellCheckingEnabled = true;
         this.spellCheckTimeout = null;
-        
+
         // Initialize debounced methods
         this.setupDebouncedMethods();
     }
@@ -93,7 +93,9 @@ class SpellChecker {
      */
     clearSpellCheckBadges() {
         // Remove all spell check error count badges
-        const badges = this.textEditor.querySelectorAll(`.${this.config.CSS_CLASSES.ERROR_COUNT_BADGE}`);
+        const badges = this.textEditor.querySelectorAll(
+            `.${this.config.CSS_CLASSES.ERROR_COUNT_BADGE}`
+        );
         badges.forEach(badge => {
             console.log('Removing spell check badge:', badge.textContent);
             badge.remove();
@@ -119,7 +121,11 @@ class SpellChecker {
      */
     requestSpellCheck() {
         try {
-            if (!this.fileManager.hasCurrentFile() || !this.getConnectionState() || !this.spellCheckingEnabled) {
+            if (
+                !this.fileManager.hasCurrentFile() ||
+                !this.getConnectionState() ||
+                !this.spellCheckingEnabled
+            ) {
                 return;
             }
 
@@ -212,9 +218,12 @@ class SpellChecker {
         this.spellErrors = errors;
 
         // MODIFIED: Allow highlighting even if prediction is active, but be more careful about DOM manipulation
-        const hasActivePrediction = this.getSuggestionVisible() && document.getElementById('current-inline-suggestion');
+        const hasActivePrediction =
+            this.getSuggestionVisible() && document.getElementById('current-inline-suggestion');
         if (hasActivePrediction) {
-            console.log('Inline suggestion is active but still highlighting spell errors (with caution)');
+            console.log(
+                'Inline suggestion is active but still highlighting spell errors (with caution)'
+            );
         }
 
         // If user is actively typing, delay highlighting to avoid cursor jumping
@@ -254,9 +263,12 @@ class SpellChecker {
         );
 
         // MODIFIED: Allow highlighting even if prediction is active in normal highlighting
-        const hasActivePrediction = this.getSuggestionVisible() && document.getElementById('current-inline-suggestion');
+        const hasActivePrediction =
+            this.getSuggestionVisible() && document.getElementById('current-inline-suggestion');
         if (hasActivePrediction) {
-            console.log('Inline suggestion is active but still highlighting spell errors (with caution)');
+            console.log(
+                'Inline suggestion is active but still highlighting spell errors (with caution)'
+            );
         }
 
         // Save current cursor position before DOM manipulation
@@ -279,7 +291,9 @@ class SpellChecker {
                 const lineErrors = this.spellErrors[paragraphIndex] || [];
                 if (lineErrors.length === 0) return;
 
-                console.log(`Processing paragraph ${paragraphIndex} with ${lineErrors.length} errors`);
+                console.log(
+                    `Processing paragraph ${paragraphIndex} with ${lineErrors.length} errors`
+                );
 
                 // Get all word tokens in this paragraph
                 const wordTokens = Array.from(paragraph.querySelectorAll('.word-token'));
@@ -293,30 +307,35 @@ class SpellChecker {
                     // Find matching word tokens
                     wordTokens.forEach(token => {
                         const tokenWord = token.getAttribute('data-word');
-                        if (tokenWord === errorWord && !token.querySelector('.spell-error-highlight')) {
+                        if (
+                            tokenWord === errorWord &&
+                            !token.querySelector('.spell-error-highlight')
+                        ) {
                             // Create error highlight span
                             const errorSpan = this.utils.createElement(
                                 'span',
                                 {
-                                    className: 'spell-error-highlight',
+                                    'className': 'spell-error-highlight',
                                     'data-word': errorWord,
                                     'data-suggestions': JSON.stringify(error.suggestions),
-                                    style: {
+                                    'style': {
                                         textDecoration: 'underline wavy red',
-                                        cursor: 'pointer'
-                                    }
+                                        cursor: 'pointer',
+                                    },
                                 },
                                 token.textContent
                             );
 
                             // Add event listeners for spell error interactions
                             errorSpan.addEventListener('click', e => this.handleSpellErrorClick(e));
-                            errorSpan.addEventListener('contextmenu', e => this.handleSpellErrorRightClick(e));
+                            errorSpan.addEventListener('contextmenu', e =>
+                                this.handleSpellErrorRightClick(e)
+                            );
 
                             // Replace token content with error span
                             token.innerHTML = '';
                             token.appendChild(errorSpan);
-                            
+
                             highlightedCount++;
                             console.log(`Highlighted error word: "${errorWord}"`);
                         }
@@ -332,7 +351,9 @@ class SpellChecker {
                 }
             });
 
-            console.log(`Spell check highlighting complete: ${totalHighlightedCount}/${totalErrorCount} errors highlighted`);
+            console.log(
+                `Spell check highlighting complete: ${totalHighlightedCount}/${totalErrorCount} errors highlighted`
+            );
 
             // Restore cursor position
             if (savedCursorPosition !== null) {
@@ -340,7 +361,6 @@ class SpellChecker {
                     this.setCursorPosition(savedCursorPosition);
                 }, 10);
             }
-
         } catch (error) {
             this.errorHandler.handleError(
                 error,
@@ -361,7 +381,7 @@ class SpellChecker {
      */
     clearSpellErrorHighlights() {
         const textEditor = this.getTextEditor();
-        
+
         // Remove all error highlight spans
         const errorHighlights = textEditor.querySelectorAll('.spell-error-highlight');
         errorHighlights.forEach(highlight => {
@@ -416,9 +436,9 @@ class SpellChecker {
                     zIndex: '10',
                     opacity: '0.7',
                     pointerEvents: 'none', // Don't interfere with text selection
-                    visibility: 'hidden' // Hidden by default, only show on hover
+                    visibility: 'hidden', // Hidden by default, only show on hover
                 },
-                title: `${highlightedCount}/${totalCount} errors highlighted`
+                title: `${highlightedCount}/${totalCount} errors highlighted`,
             },
             totalCount.toString()
         );
@@ -483,24 +503,21 @@ class SpellChecker {
         }
 
         // Create suggestions menu
-        const menu = this.utils.createElement(
-            'div',
-            {
-                className: 'spell-suggestions-menu',
-                style: {
-                    position: 'fixed',
-                    backgroundColor: 'white',
-                    border: '1px solid #ccc',
-                    borderRadius: '4px',
-                    boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
-                    zIndex: '1000',
-                    minWidth: '200px',
-                    maxWidth: '300px',
-                    maxHeight: '300px',
-                    overflowY: 'auto'
-                }
-            }
-        );
+        const menu = this.utils.createElement('div', {
+            className: 'spell-suggestions-menu',
+            style: {
+                position: 'fixed',
+                backgroundColor: 'white',
+                border: '1px solid #ccc',
+                borderRadius: '4px',
+                boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+                zIndex: '1000',
+                minWidth: '200px',
+                maxWidth: '300px',
+                maxHeight: '300px',
+                overflowY: 'auto',
+            },
+        });
 
         menu.style.flexDirection = 'column';
 
@@ -522,8 +539,8 @@ class SpellChecker {
                         style: {
                             padding: '8px 12px',
                             cursor: 'pointer',
-                            borderBottom: '1px solid #eee'
-                        }
+                            borderBottom: '1px solid #eee',
+                        },
                     },
                     suggestion
                 );
@@ -550,8 +567,8 @@ class SpellChecker {
                     style: {
                         padding: '8px 12px',
                         fontStyle: 'italic',
-                        color: '#666'
-                    }
+                        color: '#666',
+                    },
                 },
                 'No suggestions available'
             );
@@ -559,28 +576,25 @@ class SpellChecker {
         }
 
         // Add "Add to dictionary" option
-        const addToDictionary = this.utils.createElement(
-            'div',
-            {
-                className: 'spell-suggestion-option',
-                style: {
-                    padding: '8px 12px',
-                    cursor: 'pointer',
-                    fontStyle: 'italic',
-                    backgroundColor: '#f8f9fa',
-                    borderTop: '1px solid #dee2e6',
-                    fontSize: '0.85rem',
-                    color: '#28a745',
-                    fontWeight: '500'
-                }
-            }
-        );
+        const addToDictionary = this.utils.createElement('div', {
+            className: 'spell-suggestion-option',
+            style: {
+                padding: '8px 12px',
+                cursor: 'pointer',
+                fontStyle: 'italic',
+                backgroundColor: '#f8f9fa',
+                borderTop: '1px solid #dee2e6',
+                fontSize: '0.85rem',
+                color: '#28a745',
+                fontWeight: '500',
+            },
+        });
 
         // Create the content with proper HTML structure
         const plusSpan = document.createElement('span');
         plusSpan.style.marginRight = '6px';
         plusSpan.textContent = '+';
-        
+
         addToDictionary.appendChild(plusSpan);
         addToDictionary.appendChild(document.createTextNode(`Add "${word}" to dictionary`));
 
@@ -654,7 +668,7 @@ class SpellChecker {
     addWordToDictionary(word) {
         console.log('SpellChecker.addWordToDictionary called with word:', word);
         console.log('Callback available:', !!this.addWordToDictionaryCallback);
-        
+
         // Delegate to the main TextEditor's addWordToDictionary method
         if (this.addWordToDictionaryCallback) {
             console.log('Calling addWordToDictionary callback...');
@@ -669,7 +683,7 @@ class SpellChecker {
      */
     setSpellCheckingEnabled(enabled) {
         this.spellCheckingEnabled = enabled;
-        
+
         if (!enabled) {
             this.clearSpellErrorHighlights();
             this.spellErrors = {};

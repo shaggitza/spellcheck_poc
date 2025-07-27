@@ -3,5 +3,16 @@
 node_modules/*
 spellcheck.db
 text_files/*
-package-lock.json
 coverage/*
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.coverage
+*.log
+.env
+.DS_Store
+bandit-report.json
+safety-report.json
