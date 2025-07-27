@@ -3,7 +3,6 @@
 node_modules/*
 spellcheck.db
 text_files/*
-package-lock.json
 coverage/*
 *.pyc
 *.pyo
@@ -16,3 +15,4 @@ build/
 .env
 .DS_Store
 bandit-report.json
+safety-report.json

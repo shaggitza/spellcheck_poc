@@ -18,11 +18,11 @@ class PredictionEngine {
         this.environment = options.environment || dependencies.environment;
         this.utils = options.utils || dependencies.utils;
         this.config = options.config || dependencies.config;
-        
+
         // DOM elements
         this.textEditor = options.textEditor || dependencies.textEditor;
         this.predictionText = options.predictionText || dependencies.predictionText;
-        
+
         // Required callbacks from TextEditor
         this.getEditorContent = options.getEditorContent || dependencies.getEditorContent;
         this.getCursorPosition = options.getCursorPosition || dependencies.getCursorPosition;
@@ -32,7 +32,7 @@ class PredictionEngine {
         this.handleTextChange = options.handleTextChange || dependencies.handleTextChange;
         this.clearTimeoutSafe = options.clearTimeoutSafe || dependencies.clearTimeoutSafe;
         this.setTimeoutSafe = options.setTimeoutSafe || dependencies.setTimeoutSafe;
-        
+
         // Prediction state
         this.currentPrediction = null;
         this.suggestionVisible = false;
@@ -40,7 +40,7 @@ class PredictionEngine {
         this.isTyping = false;
         this.preserveSuggestion = false; // Flag to preserve suggestion during partial acceptance
         this.predictionEnabled = true; // Whether prediction is enabled
-        
+
         console.log('✅ PredictionEngine initialized');
     }
 
@@ -65,7 +65,11 @@ class PredictionEngine {
      * Handle prediction response from WebSocket
      */
     handlePredictionResponse(prediction, cursorPosition, metadata = {}) {
-        console.log('PredictionEngine: Received prediction:', { prediction, cursorPosition, metadata });
+        console.log('PredictionEngine: Received prediction:', {
+            prediction,
+            cursorPosition,
+            metadata,
+        });
 
         this.currentPrediction = {
             text: prediction,
@@ -91,7 +95,7 @@ class PredictionEngine {
             prediction &&
             prediction.trim() &&
             Math.abs(currentCursorPos - (metadata.original_cursor_position || cursorPosition)) <=
-            this.config.TEXT.MAX_CURSOR_POSITION_TOLERANCE
+                this.config.TEXT.MAX_CURSOR_POSITION_TOLERANCE
         ) {
             this.showInlineSuggestion(prediction);
         } else {
@@ -226,26 +230,26 @@ class PredictionEngine {
 
             if (suggestionElement) {
                 const suggestionText = suggestionElement.textContent;
-                
+
                 console.log('Debug suggestion text:', {
                     text: suggestionText,
                     length: suggestionText.length,
                     charCodes: Array.from(suggestionText).map(c => c.charCodeAt(0)),
-                    repr: JSON.stringify(suggestionText)
+                    repr: JSON.stringify(suggestionText),
                 });
-                
+
                 // Don't trim - preserve all original spacing
                 if (!suggestionText || !suggestionText.trim()) {
                     console.log('Suggestion text is empty or only whitespace');
                     return;
                 }
-                
+
                 console.log('Processing suggestion text:', {
                     text: suggestionText,
                     length: suggestionText.length,
-                    repr: JSON.stringify(suggestionText)
+                    repr: JSON.stringify(suggestionText),
                 });
-                
+
                 // Find the first word and preserve the original spacing before and after it
                 // This regex captures: (optional leading whitespace)(first word)(everything else)
                 const wordMatch = suggestionText.match(/^(\s*)(\S+)(.*)$/);
@@ -253,11 +257,11 @@ class PredictionEngine {
                     console.log('Could not parse first word from suggestion');
                     return;
                 }
-                
+
                 const leadingSpace = wordMatch[1];
-                const firstWord = wordMatch[2]; 
+                const firstWord = wordMatch[2];
                 const remainingText = wordMatch[3]; // This preserves original spacing after the first word
-                
+
                 console.log('Partial suggestion breakdown:', {
                     original: suggestionText,
                     originalRepr: JSON.stringify(suggestionText),
@@ -268,29 +272,29 @@ class PredictionEngine {
                     remaining: remainingText,
                     remainingRepr: JSON.stringify(remainingText),
                     remainingLength: remainingText.length,
-                    hasRemaining: remainingText.length > 0
+                    hasRemaining: remainingText.length > 0,
                 });
 
                 // Replace suggestion with first word as plain text (including any leading space)
                 const textNode = document.createTextNode(leadingSpace + firstWord);
                 suggestionElement.parentNode.insertBefore(textNode, suggestionElement);
-                
+
                 if (remainingText && remainingText.trim()) {
                     console.log('Before updating suggestion element:', {
                         elementText: suggestionElement.textContent,
                         elementRepr: JSON.stringify(suggestionElement.textContent),
                         newRemainingText: remainingText,
-                        newRemainingRepr: JSON.stringify(remainingText)
+                        newRemainingRepr: JSON.stringify(remainingText),
                     });
-                    
+
                     // Update suggestion with remaining text (preserve original spacing)
                     suggestionElement.textContent = remainingText;
-                    
+
                     console.log('After updating suggestion element:', {
                         elementText: suggestionElement.textContent,
-                        elementRepr: JSON.stringify(suggestionElement.textContent)
+                        elementRepr: JSON.stringify(suggestionElement.textContent),
                     });
-                    
+
                     // Position cursor between accepted text and remaining suggestion
                     const selection = window.getSelection();
                     const range = document.createRange();
@@ -298,22 +302,27 @@ class PredictionEngine {
                     range.collapse(true);
                     selection.removeAllRanges();
                     selection.addRange(range);
-                    
+
                     // Update current prediction with remaining text
                     if (this.currentPrediction) {
                         this.currentPrediction.text = remainingText;
-                        console.log('Updated currentPrediction.text:', JSON.stringify(this.currentPrediction.text));
+                        console.log(
+                            'Updated currentPrediction.text:',
+                            JSON.stringify(this.currentPrediction.text)
+                        );
                     }
-                    
+
                     // Don't trigger text change when there are remaining words
                     // This prevents automatic prediction requests and lets user continue partial acceptance
-                    console.log('Partial acceptance complete - remaining words available, not triggering prediction request');
+                    console.log(
+                        'Partial acceptance complete - remaining words available, not triggering prediction request'
+                    );
                 } else {
                     // No remaining text, remove suggestion completely
                     suggestionElement.remove();
                     this.currentPrediction = null;
                     this.suggestionVisible = false;
-                    
+
                     // Position cursor after accepted text
                     const selection = window.getSelection();
                     const range = document.createRange();
@@ -321,10 +330,12 @@ class PredictionEngine {
                     range.collapse(true);
                     selection.removeAllRanges();
                     selection.addRange(range);
-                    
+
                     // Only trigger text change when all words are accepted
                     this.handleTextChange();
-                    console.log('All words accepted - triggering text change and prediction request');
+                    console.log(
+                        'All words accepted - triggering text change and prediction request'
+                    );
                 }
             } else {
                 // Fallback if no suggestion element found - still trigger text change
@@ -408,7 +419,9 @@ class PredictionEngine {
                     const currentWebsocket = this.getWebSocket();
                     if (!currentWebsocket || currentWebsocket.readyState !== WebSocket.OPEN) {
                         if (this.environment.isDevelopment()) {
-                            console.log('Cannot send prediction request - WebSocket disconnected during debounce');
+                            console.log(
+                                'Cannot send prediction request - WebSocket disconnected during debounce'
+                            );
                         }
                         return;
                     }
@@ -524,7 +537,7 @@ class PredictionEngine {
      */
     setPredictionEnabled(enabled) {
         this.predictionEnabled = enabled;
-        
+
         if (!enabled) {
             // Hide any active suggestions and clear prediction
             this.clearPrediction();

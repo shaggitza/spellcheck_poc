@@ -161,11 +161,13 @@ The system includes intelligent responses for common writing patterns:
 ### Development Setup
 
 **Prerequisites:**
-- Python 3.9+ 
+
+- Python 3.9+
 - Node.js 18+
 - Git
 
 **Quick Setup:**
+
 ```bash
 # Clone the repository
 git clone https://github.com/shaggitza/spellcheck_poc.git
@@ -194,6 +196,7 @@ python main.py
 The project uses several tools to maintain code quality:
 
 **Python:**
+
 - `flake8` - Linting and style checking
 - `black` - Code formatting
 - `isort` - Import sorting
@@ -202,11 +205,13 @@ The project uses several tools to maintain code quality:
 - `bandit` - Security linting
 
 **JavaScript:**
-- `eslint` - Linting and style checking  
+
+- `eslint` - Linting and style checking
 - `prettier` - Code formatting
 - `jest` - Testing framework
 
 **Run all quality checks:**
+
 ```bash
 # Python
 flake8 .
@@ -216,7 +221,7 @@ pytest
 
 # JavaScript
 npm run lint
-npm run format:check  
+npm run format:check
 npm test
 ```
 
@@ -225,6 +230,7 @@ npm test
 The project uses GitHub Actions for CI/CD with the following workflows:
 
 **Main CI Pipeline (`.github/workflows/ci.yml`):**
+
 - ✅ **Frontend Testing**: Node.js 18, ESLint, Prettier, Jest
 - ✅ **Backend Testing**: Python 3.9-3.12 matrix testing
 - ✅ **Code Quality**: Linting, formatting checks
@@ -233,6 +239,7 @@ The project uses GitHub Actions for CI/CD with the following workflows:
 - ✅ **Coverage Reporting**: Code coverage with Codecov
 
 **Code Quality Pipeline (`.github/workflows/code-quality.yml`):**
+
 - ✅ **CodeQL Analysis**: Security and quality analysis
 - ✅ **Dependency Review**: Automated dependency vulnerability checks
 - ✅ **Outdated Dependencies**: Weekly checks for package updates

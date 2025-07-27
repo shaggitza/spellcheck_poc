@@ -11,29 +11,29 @@ class FileManager {
         this.errorHandler = dependencies.errorHandler;
         this.environment = dependencies.environment;
         this.config = dependencies.config;
-        
+
         // DOM elements
         this.fileList = dependencies.fileList;
         this.saveButton = dependencies.saveButton;
         this.currentFileNameElement = dependencies.currentFileName;
         this.newFileName = dependencies.newFileName;
         this.createFileButton = dependencies.createFileButton;
-        
+
         // Callbacks for TextEditor integration
         this.onFileLoaded = dependencies.onFileLoaded;
         this.onFileCreated = dependencies.onFileCreated;
         this.onFileSaved = dependencies.onFileSaved;
-        
+
         // WebSocket and connection state
         this.getWebSocket = dependencies.getWebSocket;
         this.getConnectionState = dependencies.getConnectionState;
         this.getAbortController = dependencies.getAbortController;
-        
+
         // Editor content management
         this.getEditorContent = dependencies.getEditorContent;
         this.setEditorContent = dependencies.setEditorContent;
         this.getCursorPosition = dependencies.getCursorPosition;
-        
+
         // State
         this.currentFile = null;
         this.currentFileName = '';
@@ -43,12 +43,12 @@ class FileManager {
         this.settings = {
             autoSaveEnabled: false,
             autoSaveInterval: 30000,
-            maxRecentFiles: 10
+            maxRecentFiles: 10,
         };
 
         // Load saved settings and recent files
         this.loadSettings();
-        
+
         // Initialize event listeners
         this.initializeEventListeners();
     }
@@ -94,12 +94,12 @@ class FileManager {
     initializeEventListeners() {
         // Save file button
         this.saveButton.addEventListener('click', () => this.saveCurrentFile());
-        
+
         // Create new file button
         this.createFileButton.addEventListener('click', () => this.createNewFile());
-        
+
         // Enter key on new file name input
-        this.newFileName.addEventListener('keypress', (e) => {
+        this.newFileName.addEventListener('keypress', e => {
             if (e.key === 'Enter') {
                 this.createNewFile();
             }
@@ -153,7 +153,7 @@ class FileManager {
     async handleInitialFileSelection(files) {
         const urlParams = new URLSearchParams(window.location.search);
         const urlFilename = urlParams.get('file');
-        
+
         if (urlFilename && files.some(f => f.name === urlFilename)) {
             // Priority 1: URL parameter with specific file
             await this.loadFile(urlFilename, false); // Don't update URL again
@@ -181,7 +181,7 @@ class FileManager {
 
             const abortController = this.getAbortController();
             const response = await fetch(`/api/files/${filename}`, {
-                signal: abortController.signal
+                signal: abortController.signal,
             });
             const data = await response.json();
 
@@ -213,7 +213,6 @@ class FileManager {
             if (this.onFileLoaded) {
                 this.onFileLoaded(filename);
             }
-
         } catch (error) {
             this.errorHandler.handleError(
                 error,
@@ -295,7 +294,7 @@ class FileManager {
 
             // Save the new empty file
             await this.saveCurrentFile();
-            
+
             // Reload file list to show the new file
             await this.loadFileList();
 
@@ -303,7 +302,6 @@ class FileManager {
             if (this.onFileCreated) {
                 this.onFileCreated(sanitizedFilename);
             }
-
         } catch (error) {
             this.errorHandler.handleError(error, 'file-creation', 'Failed to create new file');
         }
@@ -343,7 +341,7 @@ class FileManager {
             const ws = this.getWebSocket();
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify(message));
-                
+
                 // Notify TextEditor that file was saved
                 if (this.onFileSaved) {
                     this.onFileSaved(this.currentFile);
@@ -351,7 +349,6 @@ class FileManager {
             } else {
                 throw new Error('WebSocket connection not available');
             }
-
         } catch (error) {
             this.errorHandler.handleError(error, 'file-saving', 'Failed to save current file', {
                 filename: this.currentFile,
@@ -364,7 +361,7 @@ class FileManager {
      */
     updateUrl(filename) {
         if (!filename) return;
-        
+
         const url = new URL(window.location);
         url.searchParams.set('file', filename);
         window.history.pushState(null, '', url.toString());
@@ -403,7 +400,7 @@ class FileManager {
             this.currentFileNameElement.textContent = '';
         }
         this.saveButton.disabled = true;
-        
+
         // Clear active state from file list
         document.querySelectorAll('.list-group-item').forEach(item => {
             item.classList.remove('active');
@@ -461,12 +458,12 @@ class FileManager {
     detectFileType(filename) {
         const extension = filename.split('.').pop().toLowerCase();
         const typeMap = {
-            'txt': 'text',
-            'md': 'markdown',
-            'js': 'javascript',
-            'json': 'json',
-            'html': 'html',
-            'css': 'css'
+            txt: 'text',
+            md: 'markdown',
+            js: 'javascript',
+            json: 'json',
+            html: 'html',
+            css: 'css',
         };
         return typeMap[extension] || 'text';
     }
@@ -545,7 +542,9 @@ class FileManager {
         try {
             // Check if current file is modified
             if (this.isModified) {
-                const shouldSave = confirm('Current file has unsaved changes. Save before creating new file?');
+                const shouldSave = confirm(
+                    'Current file has unsaved changes. Save before creating new file?'
+                );
                 if (shouldSave) {
                     await this.saveFile();
                 }
@@ -598,7 +597,7 @@ class FileManager {
             file: this.currentFile,
             modified: this.isModified,
             lastSaved: this.lastSaveTime,
-            type: this.detectFileType(this.currentFileName)
+            type: this.detectFileType(this.currentFileName),
         };
     }
 
@@ -687,7 +686,8 @@ class FileManager {
     /**
      * Validate file size
      */
-    validateFileSize(file, maxSize = 10 * 1024 * 1024) { // 10MB default
+    validateFileSize(file, maxSize = 10 * 1024 * 1024) {
+        // 10MB default
         return file.size <= maxSize;
     }
 
@@ -708,7 +708,7 @@ class FileManager {
     /**
      * Handle corrupted files
      */
-    handleCorruptedFile(file) {
+    handleCorruptedFile(_file) {
         this.errorHandler.showError('File appears to be corrupted and cannot be opened');
         return null;
     }
@@ -743,7 +743,7 @@ class FileManager {
         this.saveButton.removeEventListener('click', () => this.saveCurrentFile());
         this.createFileButton.removeEventListener('click', () => this.createNewFile());
         this.newFileName.removeEventListener('keypress', () => {});
-        
+
         // Clear state
         this.currentFile = null;
     }

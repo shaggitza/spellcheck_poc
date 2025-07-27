@@ -90,7 +90,7 @@ class TextEditor {
         // Use AbortSignal for automatic cleanup
         const listenerOptions = {
             ...options,
-            signal: this.abortController.signal
+            signal: this.abortController.signal,
         };
 
         element.addEventListener(event, handler, listenerOptions);
@@ -100,13 +100,13 @@ class TextEditor {
             element,
             event,
             handler,
-            options: listenerOptions
+            options: listenerOptions,
         });
 
         return listenerId;
     }
 
-    // Safe timeout management  
+    // Safe timeout management
     setTimeoutSafe(callback, delay) {
         const timeoutId = setTimeout(() => {
             this.timeouts.delete(timeoutId);
@@ -190,7 +190,6 @@ class TextEditor {
             if (this.environment.isDevelopment()) {
                 console.log('✅ TextEditor cleanup completed successfully');
             }
-
         } catch (error) {
             this.errorHandler.handleError(error, 'cleanup', 'Error during cleanup process');
         }
@@ -295,9 +294,9 @@ class TextEditor {
             createFileButton: this.createFile,
 
             // Callbacks for integration
-            onFileLoaded: (filename) => this.handleFileLoaded(filename),
-            onFileCreated: (filename) => this.handleFileCreated(filename),
-            onFileSaved: (filename) => this.handleFileSaved(filename),
+            onFileLoaded: filename => this.handleFileLoaded(filename),
+            onFileCreated: filename => this.handleFileCreated(filename),
+            onFileSaved: filename => this.handleFileSaved(filename),
 
             // WebSocket and state getters
             getWebSocket: () => this.ws,
@@ -306,7 +305,7 @@ class TextEditor {
 
             // Editor content management
             getEditorContent: () => this.getEditorContent(),
-            setEditorContent: (content) => this.setEditorContent(content),
+            setEditorContent: content => this.setEditorContent(content),
             getCursorPosition: () => this.getCursorPosition(),
         });
     }
@@ -328,23 +327,24 @@ class TextEditor {
             // Editor content and cursor management
             getEditorContent: () => this.getEditorContent(),
             getCursorPosition: () => this.getCursorPosition(),
-            setCursorPosition: (position) => this.setCursorPosition(position),
+            setCursorPosition: position => this.setCursorPosition(position),
             getTextEditor: () => this.textEditor,
 
             // State management callbacks
             getIsTyping: () => this.isTyping,
-            getSuggestionVisible: () => this.predictionEngine ? this.predictionEngine.isSuggestionVisible() : false,
+            getSuggestionVisible: () =>
+                this.predictionEngine ? this.predictionEngine.isSuggestionVisible() : false,
 
             // FileManager integration
             fileManager: this.fileManager,
 
             // Timeout management
             setTimeoutSafe: (callback, delay) => this.setTimeoutSafe(callback, delay),
-            clearTimeoutSafe: (timeoutId) => this.clearTimeoutSafe(timeoutId),
+            clearTimeoutSafe: timeoutId => this.clearTimeoutSafe(timeoutId),
 
             // Text change and dictionary management
             handleTextChange: () => this.handleTextChange(),
-            addWordToDictionary: (word) => this.addWordToDictionary(word),
+            addWordToDictionary: word => this.addWordToDictionary(word),
         });
     }
 
@@ -366,11 +366,11 @@ class TextEditor {
             // Required callbacks from TextEditor
             getEditorContent: () => this.getEditorContent(),
             getCursorPosition: () => this.getCursorPosition(),
-            setCursorPosition: (position) => this.setCursorPosition(position),
+            setCursorPosition: position => this.setCursorPosition(position),
             getParagraphContext: (content, cursor) => this.getParagraphContext(content, cursor),
             isAtWordBoundary: () => this.isAtWordBoundary(),
             handleTextChange: () => this.handleTextChange(),
-            clearTimeoutSafe: (timeoutId) => this.clearTimeoutSafe(timeoutId),
+            clearTimeoutSafe: timeoutId => this.clearTimeoutSafe(timeoutId),
             setTimeoutSafe: (callback, delay) => this.setTimeoutSafe(callback, delay),
         });
 
@@ -409,7 +409,9 @@ class TextEditor {
 
         // Dictionary management
         if (this.addWordBtn) {
-            this.addEventListenerSafe(this.addWordBtn, 'click', () => this.addWordToDictionaryFromInput());
+            this.addEventListenerSafe(this.addWordBtn, 'click', () =>
+                this.addWordToDictionaryFromInput()
+            );
         }
         if (this.addWordInput) {
             this.addEventListenerSafe(this.addWordInput, 'keypress', _e => {
@@ -424,14 +426,20 @@ class TextEditor {
 
         // Feature toggle buttons
         if (this.predictionToggleBtn) {
-            this.addEventListenerSafe(this.predictionToggleBtn, 'click', () => this.togglePredictions());
+            this.addEventListenerSafe(this.predictionToggleBtn, 'click', () =>
+                this.togglePredictions()
+            );
         }
         if (this.spellCheckToggleBtn) {
-            this.addEventListenerSafe(this.spellCheckToggleBtn, 'click', () => this.toggleSpellCheck());
+            this.addEventListenerSafe(this.spellCheckToggleBtn, 'click', () =>
+                this.toggleSpellCheck()
+            );
         }
 
         // Paragraph action buttons
-        this.addEventListenerSafe(this.paragraphActions, 'click', e => this.handleParagraphAction(e));
+        this.addEventListenerSafe(this.paragraphActions, 'click', e =>
+            this.handleParagraphAction(e)
+        );
 
         // Global keyboard shortcuts
         this.addEventListenerSafe(document, 'keydown', e => {
@@ -445,13 +453,21 @@ class TextEditor {
         this.addEventListenerSafe(document, 'keydown', e => {
             if (e.key === 'ArrowRight' && e.ctrlKey) {
                 console.log('GLOBAL: Ctrl + Right Arrow detected', {
-                    suggestionVisible: this.predictionEngine ? this.predictionEngine.isSuggestionVisible() : false,
-                    currentPrediction: this.predictionEngine ? !!this.predictionEngine.getCurrentPrediction() : false,
+                    suggestionVisible: this.predictionEngine
+                        ? this.predictionEngine.isSuggestionVisible()
+                        : false,
+                    currentPrediction: this.predictionEngine
+                        ? !!this.predictionEngine.getCurrentPrediction()
+                        : false,
                     activeElement: document.activeElement,
                     isInEditor: this.textEditor.contains(document.activeElement),
                 });
 
-                if (this.predictionEngine && this.predictionEngine.isSuggestionVisible() && this.predictionEngine.getCurrentPrediction()) {
+                if (
+                    this.predictionEngine &&
+                    this.predictionEngine.isSuggestionVisible() &&
+                    this.predictionEngine.getCurrentPrediction()
+                ) {
                     console.log('GLOBAL: Calling acceptPartialSuggestion');
                     e.preventDefault();
                     e.stopPropagation();
@@ -604,7 +620,7 @@ class TextEditor {
                 console.log('WebSocket connected');
                 this.isConnected = true;
                 this.updateConnectionStatus(CONFIG.CSS_CLASSES.CONNECTION_CONNECTED);
-                
+
                 // Load settings from server after connection is established
                 this.loadSettings();
             };
@@ -689,7 +705,10 @@ class TextEditor {
 
                 case CONFIG.EVENTS.WEBSOCKET.SPELL_CHECK_RESPONSE:
                     if (this.spellChecker) {
-                        this.spellChecker.handleSpellCheckResponse(message.errors, message.language);
+                        this.spellChecker.handleSpellCheckResponse(
+                            message.errors,
+                            message.language
+                        );
                     }
                     break;
 
@@ -1360,7 +1379,7 @@ class TextEditor {
                 if (this.predictionEngine) {
                     this.predictionEngine.setTypingState(false);
                 }
-            // Run normalization after typing stops
+                // Run normalization after typing stops
                 this.setTimeoutSafe(
                     () => this.normalizeEditorStructure(),
                     CONFIG.TIMING.NORMALIZATION_AFTER_TYPING
@@ -1391,7 +1410,11 @@ class TextEditor {
             }
 
             // CRITICAL: Skip normalization if there's an active inline suggestion
-            if (this.predictionEngine && this.predictionEngine.isSuggestionVisible() && document.getElementById('current-inline-suggestion')) {
+            if (
+                this.predictionEngine &&
+                this.predictionEngine.isSuggestionVisible() &&
+                document.getElementById('current-inline-suggestion')
+            ) {
                 console.log('Skipping normalization - inline suggestion is active');
                 return;
             }
@@ -1410,14 +1433,17 @@ class TextEditor {
                 let needsRestructure = false;
 
                 // Skip normalization for very new/empty paragraphs that might just have been created
-                const hasOnlyBrOrEmpty = paragraph.childNodes.length === 0 ||
+                const hasOnlyBrOrEmpty =
+                    paragraph.childNodes.length === 0 ||
                     (paragraph.childNodes.length === 1 && paragraph.firstChild.nodeName === 'BR') ||
-                    (paragraph.childNodes.length === 1 && paragraph.firstChild.nodeType === Node.TEXT_NODE && paragraph.firstChild.textContent === '');
+                    (paragraph.childNodes.length === 1 &&
+                        paragraph.firstChild.nodeType === Node.TEXT_NODE &&
+                        paragraph.firstChild.textContent === '');
 
                 if (hasOnlyBrOrEmpty) {
                     console.log('Skipping normalization for empty/new paragraph');
                     return;
-                }                // Look for text nodes that aren't just whitespace AND are not inside word-token spans
+                } // Look for text nodes that aren't just whitespace AND are not inside word-token spans
                 const walker = document.createTreeWalker(
                     paragraph,
                     NodeFilter.SHOW_TEXT,
@@ -1509,7 +1535,7 @@ class TextEditor {
 
             // Check if cursor is in this paragraph (including the \n\n separator)
             if (cursorPosition <= paragraphEnd + 2) {
-            // +2 for \n\n
+                // +2 for \n\n
                 currentParagraphIndex = i;
                 break;
             }
@@ -1893,7 +1919,7 @@ class TextEditor {
                 }
 
                 console.log('✅ Settings loaded:', settings);
-                
+
                 // Initialize toggle button states
                 this.updateToggleButton('spellCheck', this.spellCheckingEnabled);
                 this.updateToggleButton('prediction', this.predictionEnabled);
@@ -2038,30 +2064,30 @@ class TextEditor {
      */
     togglePredictions() {
         this.predictionEnabled = !this.predictionEnabled;
-        
+
         if (this.predictionEngine) {
             this.predictionEngine.setPredictionEnabled(this.predictionEnabled);
         }
-        
+
         this.updateToggleButton('prediction', this.predictionEnabled);
         this.saveSetting('prediction_enabled', this.predictionEnabled);
-        
+
         console.log(`Predictions ${this.predictionEnabled ? 'enabled' : 'disabled'}`);
     }
 
     /**
-     * Toggle spell checking functionality on/off  
+     * Toggle spell checking functionality on/off
      */
     toggleSpellCheck() {
         this.spellCheckingEnabled = !this.spellCheckingEnabled;
-        
+
         if (this.spellChecker) {
             this.spellChecker.setSpellCheckingEnabled(this.spellCheckingEnabled);
         }
-        
+
         this.updateToggleButton('spellCheck', this.spellCheckingEnabled);
         this.saveSetting('spell_check_enabled', this.spellCheckingEnabled);
-        
+
         console.log(`Spell checking ${this.spellCheckingEnabled ? 'enabled' : 'disabled'}`);
     }
 
@@ -2070,7 +2096,7 @@ class TextEditor {
      */
     updateToggleButton(type, enabled) {
         let button, icon;
-        
+
         if (type === 'prediction') {
             button = this.predictionToggleBtn;
             icon = this.predictionToggleIcon;
@@ -2078,13 +2104,13 @@ class TextEditor {
             button = this.spellCheckToggleBtn;
             icon = this.spellCheckToggleIcon;
         }
-        
+
         if (!button || !icon) return;
-        
+
         // Ensure button is never actually disabled (always clickable)
         button.removeAttribute('disabled');
         button.disabled = false;
-        
+
         if (enabled) {
             button.classList.remove('disabled');
             button.classList.add('enabled');
@@ -2096,8 +2122,10 @@ class TextEditor {
             icon.textContent = type === 'prediction' ? '🚫' : '❌';
             button.title = `Enable ${type === 'prediction' ? 'AI Predictions' : 'Spell Checking'}`;
         }
-        
-        console.log(`Toggle button updated: ${type} = ${enabled ? 'enabled' : 'disabled'} (clickable: true)`);
+
+        console.log(
+            `Toggle button updated: ${type} = ${enabled ? 'enabled' : 'disabled'} (clickable: true)`
+        );
     }
 
     /**
@@ -2106,7 +2134,7 @@ class TextEditor {
     async saveSetting(key, value) {
         try {
             const settings = { [key]: value };
-            
+
             const response = await fetch('/api/settings', {
                 method: 'POST',
                 headers: {
