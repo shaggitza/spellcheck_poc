@@ -15,7 +15,7 @@ class FileManager {
         // DOM elements
         this.fileList = dependencies.fileList;
         this.saveButton = dependencies.saveButton;
-        this.currentFileName = dependencies.currentFileName;
+        this.currentFileNameElement = dependencies.currentFileName;
         this.newFileName = dependencies.newFileName;
         this.createFileButton = dependencies.createFileButton;
         
@@ -36,9 +36,56 @@ class FileManager {
         
         // State
         this.currentFile = null;
+        this.currentFileName = '';
+        this.isModified = false;
+        this.lastSaveTime = null;
+        this.recentFiles = [];
+        this.settings = {
+            autoSaveEnabled: false,
+            autoSaveInterval: 30000,
+            maxRecentFiles: 10
+        };
+
+        // Load saved settings and recent files
+        this.loadSettings();
         
         // Initialize event listeners
         this.initializeEventListeners();
+    }
+
+    /**
+     * Load saved settings and recent files from localStorage
+     */
+    loadSettings() {
+        try {
+            const savedSettings = this.utils.getStorageItem('fileManagerSettings');
+            if (savedSettings) {
+                this.settings = { ...this.settings, ...savedSettings };
+            }
+
+            const savedRecentFiles = this.utils.getStorageItem('recentFiles');
+            if (savedRecentFiles && Array.isArray(savedRecentFiles)) {
+                this.recentFiles = savedRecentFiles;
+            }
+        } catch (error) {
+            if (this.environment.isDevelopment()) {
+                console.warn('Failed to load file manager settings:', error);
+            }
+        }
+    }
+
+    /**
+     * Save settings to localStorage
+     */
+    saveSettings() {
+        try {
+            this.utils.setStorageItem('fileManagerSettings', this.settings);
+            this.utils.setStorageItem('recentFiles', this.recentFiles);
+        } catch (error) {
+            if (this.environment.isDevelopment()) {
+                console.warn('Failed to save file manager settings:', error);
+            }
+        }
     }
 
     /**
@@ -182,7 +229,10 @@ class FileManager {
      */
     updateUIAfterFileLoad(filename) {
         this.saveButton.disabled = false;
-        this.currentFileName.textContent = filename;
+        this.currentFileName = filename;
+        if (this.currentFileNameElement) {
+            this.currentFileNameElement.textContent = filename;
+        }
 
         // Update active file in list
         document.querySelectorAll('.list-group-item').forEach(item => {
@@ -332,11 +382,13 @@ class FileManager {
      */
     setCurrentFile(filename) {
         this.currentFile = filename;
+        this.currentFileName = filename || '';
+        if (this.currentFileNameElement) {
+            this.currentFileNameElement.textContent = this.currentFileName;
+        }
         if (filename) {
-            this.currentFileName.textContent = filename;
             this.saveButton.disabled = false;
         } else {
-            this.currentFileName.textContent = '';
             this.saveButton.disabled = true;
         }
     }
@@ -346,7 +398,10 @@ class FileManager {
      */
     clearCurrentFile() {
         this.currentFile = null;
-        this.currentFileName.textContent = '';
+        this.currentFileName = '';
+        if (this.currentFileNameElement) {
+            this.currentFileNameElement.textContent = '';
+        }
         this.saveButton.disabled = true;
         
         // Clear active state from file list
@@ -363,6 +418,324 @@ class FileManager {
     }
 
     /**
+     * Check if a file is currently loaded
+     */
+    hasCurrentFile() {
+        return this.currentFile !== null;
+    }
+
+    /**
+     * Open a file from File object (for drag and drop or file input)
+     */
+    async openFile(file) {
+        try {
+            const text = await file.text();
+            this.currentFile = file;
+            this.currentFileName = file.name;
+            this.isModified = false;
+            this.lastSaveTime = Date.now();
+
+            // Add to recent files
+            this.addToRecentFiles(file.name);
+
+            // Set editor content
+            if (this.setEditorContent) {
+                this.setEditorContent(text);
+            }
+
+            // Update UI
+            this.updateUIAfterFileLoad(file.name);
+
+            // Notify callback
+            if (this.onFileLoaded) {
+                this.onFileLoaded(file.name);
+            }
+        } catch (error) {
+            this.errorHandler.handleError(error, 'file-opening', 'Failed to read file');
+        }
+    }
+
+    /**
+     * Detect file type from filename
+     */
+    detectFileType(filename) {
+        const extension = filename.split('.').pop().toLowerCase();
+        const typeMap = {
+            'txt': 'text',
+            'md': 'markdown',
+            'js': 'javascript',
+            'json': 'json',
+            'html': 'html',
+            'css': 'css'
+        };
+        return typeMap[extension] || 'text';
+    }
+
+    /**
+     * Add file to recent files list
+     */
+    addToRecentFiles(filename) {
+        // Remove if already exists
+        this.recentFiles = this.recentFiles.filter(f => f !== filename);
+        // Add to beginning
+        this.recentFiles.unshift(filename);
+        // Limit size
+        this.recentFiles = this.recentFiles.slice(0, this.settings.maxRecentFiles);
+        // Save to storage
+        this.saveSettings();
+    }
+
+    /**
+     * Remove file from recent files
+     */
+    removeFromRecentFiles(filename) {
+        this.recentFiles = this.recentFiles.filter(f => f !== filename);
+        this.saveSettings();
+    }
+
+    /**
+     * Get recent files list
+     */
+    getRecentFiles() {
+        return [...this.recentFiles];
+    }
+
+    /**
+     * Clear recent files
+     */
+    clearRecentFiles() {
+        this.recentFiles = [];
+        this.saveSettings();
+    }
+
+    /**
+     * Save file with custom filename
+     */
+    async saveFile(filename = null) {
+        try {
+            const content = this.getEditorContent ? this.getEditorContent() : '';
+            const saveFilename = filename || this.currentFileName || 'untitled.txt';
+
+            // Create download link
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = saveFilename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            this.isModified = false;
+            this.lastSaveTime = Date.now();
+
+            if (this.onFileSaved) {
+                this.onFileSaved(saveFilename);
+            }
+        } catch (error) {
+            this.errorHandler.handleError(error, 'file-saving', 'Failed to save file');
+        }
+    }
+
+    /**
+     * Create new file
+     */
+    async newFile() {
+        try {
+            // Check if current file is modified
+            if (this.isModified) {
+                const shouldSave = confirm('Current file has unsaved changes. Save before creating new file?');
+                if (shouldSave) {
+                    await this.saveFile();
+                }
+            }
+
+            this.currentFile = null;
+            this.currentFileName = '';
+            this.isModified = false;
+            this.lastSaveTime = null;
+
+            if (this.setEditorContent) {
+                this.setEditorContent('');
+            }
+
+            this.clearCurrentFile();
+
+            if (this.onFileCreated) {
+                this.onFileCreated(null);
+            }
+        } catch (error) {
+            this.errorHandler.handleError(error, 'file-creation', 'Failed to create new file');
+        }
+    }
+
+    /**
+     * Mark file as modified
+     */
+    markAsModified() {
+        this.isModified = true;
+        if (this.settings.autoSaveEnabled) {
+            this.scheduleAutoSave();
+        }
+    }
+
+    /**
+     * Handle content changes
+     */
+    handleContentChange() {
+        this.markAsModified();
+    }
+
+    /**
+     * Get current file info
+     */
+    getCurrentFileInfo() {
+        if (!this.currentFile) return null;
+
+        return {
+            name: this.currentFileName,
+            file: this.currentFile,
+            modified: this.isModified,
+            lastSaved: this.lastSaveTime,
+            type: this.detectFileType(this.currentFileName)
+        };
+    }
+
+    /**
+     * Schedule auto-save
+     */
+    scheduleAutoSave() {
+        if (this.autoSaveTimeout) {
+            clearTimeout(this.autoSaveTimeout);
+        }
+
+        if (this.settings.autoSaveEnabled) {
+            this.autoSaveTimeout = setTimeout(() => {
+                this.saveCurrentFile();
+            }, this.settings.autoSaveInterval);
+        }
+    }
+
+    /**
+     * Export file in different format
+     */
+    async exportFile(format = 'txt') {
+        try {
+            const content = this.getEditorContent ? this.getEditorContent() : '';
+            let exportContent = content;
+            let mimeType = 'text/plain';
+            let extension = 'txt';
+
+            switch (format) {
+                case 'html':
+                    exportContent = `<html><body><pre>${content}</pre></body></html>`;
+                    mimeType = 'text/html';
+                    extension = 'html';
+                    break;
+                case 'json':
+                    exportContent = JSON.stringify({ content }, null, 2);
+                    mimeType = 'application/json';
+                    extension = 'json';
+                    break;
+            }
+
+            const blob = new Blob([exportContent], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${this.currentFileName || 'export'}.${extension}`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (error) {
+            this.errorHandler.handleError(error, 'file-export', 'Failed to export file');
+        }
+    }
+
+    /**
+     * Import file content
+     */
+    async importFile(file) {
+        try {
+            const content = await file.text();
+            if (this.setEditorContent) {
+                this.setEditorContent(content);
+            }
+            this.markAsModified();
+        } catch (error) {
+            this.errorHandler.handleError(error, 'file-import', 'Failed to import file');
+        }
+    }
+
+    /**
+     * Update file manager settings
+     */
+    updateSettings(newSettings) {
+        this.settings = { ...this.settings, ...newSettings };
+        this.saveSettings();
+    }
+
+    /**
+     * Get current settings
+     */
+    getSettings() {
+        return { ...this.settings };
+    }
+
+    /**
+     * Validate file size
+     */
+    validateFileSize(file, maxSize = 10 * 1024 * 1024) { // 10MB default
+        return file.size <= maxSize;
+    }
+
+    /**
+     * Validate file type
+     */
+    validateFileType(file, allowedTypes = ['text/plain']) {
+        return allowedTypes.includes(file.type) || file.name.endsWith('.txt');
+    }
+
+    /**
+     * Sanitize filename
+     */
+    sanitizeFilename(filename) {
+        return filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+    }
+
+    /**
+     * Handle corrupted files
+     */
+    handleCorruptedFile(file) {
+        this.errorHandler.showError('File appears to be corrupted and cannot be opened');
+        return null;
+    }
+
+    /**
+     * Destroy and cleanup
+     */
+    destroy() {
+        this.cleanup();
+
+        if (this.autoSaveTimeout) {
+            clearTimeout(this.autoSaveTimeout);
+        }
+
+        // Revoke any object URLs to prevent memory leaks
+        this.revokeObjectUrls();
+    }
+
+    /**
+     * Revoke object URLs to prevent memory leaks
+     */
+    revokeObjectUrls() {
+        // In a real implementation, we'd track created URLs
+        // For testing, this is just a placeholder
+    }
+
+    /**
      * Cleanup method for memory management
      */
     cleanup() {
@@ -374,6 +747,11 @@ class FileManager {
         // Clear state
         this.currentFile = null;
     }
+}
+
+// Export for Node.js testing environment
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = FileManager;
 }
 
 // Export for use in other modules

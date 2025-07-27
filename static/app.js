@@ -339,6 +339,7 @@ class TextEditor {
             errorHandler: this.errorHandler,
             environment: this.environment,
             utils: this.utils,
+            config: CONFIG,
 
             // DOM elements
             textEditor: this.textEditor,

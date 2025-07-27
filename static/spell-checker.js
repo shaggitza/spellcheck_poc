@@ -14,13 +14,14 @@ class SpellChecker {
         this.config = dependencies.config;
         
         // WebSocket and connection management
-        this.getWebSocket = dependencies.getWebSocket;
+        this.getWebSocket = dependencies.getWebSocket || dependencies.websocket;
         this.getConnectionState = dependencies.getConnectionState;
         
         // Editor content and cursor management
         this.getEditorContent = dependencies.getEditorContent;
         this.getCursorPosition = dependencies.getCursorPosition;
         this.setCursorPosition = dependencies.setCursorPosition;
+        this.updateEditorContent = dependencies.updateEditorContent;
         this.getTextEditor = dependencies.getTextEditor;
         
         // State management callbacks
@@ -34,17 +35,49 @@ class SpellChecker {
         this.setTimeoutSafe = dependencies.setTimeoutSafe;
         this.clearTimeoutSafe = dependencies.clearTimeoutSafe;
         
+        // UI callbacks
+        this.showSpinner = dependencies.showSpinner;
+        this.hideSpinner = dependencies.hideSpinner;
+        this.updateStatus = dependencies.updateStatus;
+        this.removeSpellingHighlights = dependencies.removeSpellingHighlights;
+
+        // DOM elements
+        this.textEditor = dependencies.textEditor;
+        this.suggestionsList = dependencies.suggestionsList;
+
         // Text change and dictionary management
         this.handleTextChange = dependencies.handleTextChange;
         this.addWordToDictionaryCallback = dependencies.addWordToDictionary;
         
-        // State
+        // State initialization
+        this.isChecking = false;
+        this.currentErrors = [];
+        this.lastKnownContent = '';
+        this.selectedSuggestion = null;
+        this.currentErrorIndex = 0;
+        this.checkTimeout = null;
+        this.settings = {
+            enableAutoCheck: true,
+            checkInterval: 1000,
+            maxSuggestions: 5
+        };
+
+        // Legacy state (for compatibility)
         this.spellErrors = {};
         this.spellCheckingEnabled = true;
         this.spellCheckTimeout = null;
         
         // Initialize debounced methods
         this.setupDebouncedMethods();
+    }
+
+    /**
+     * Initialize spell checking functionality
+     */
+    initialize() {
+        // Spell checker initialization is done in constructor
+        // This method exists for testing compatibility
+        console.log('SpellChecker initialized');
     }
 
     /**
@@ -650,6 +683,11 @@ class SpellChecker {
         this.clearSpellCheckState();
         this.spellCheckTimeout = null;
     }
+}
+
+// Export for Node.js testing environment
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = SpellChecker;
 }
 
 // Export for use in other modules

@@ -4,3 +4,4 @@ node_modules/*
 spellcheck.db
 text_files/*
 package-lock.json
+coverage/*

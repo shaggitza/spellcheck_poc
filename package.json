@@ -4,7 +4,10 @@
     "description": "A modern web-based text editor with real-time writing assistance, featuring next-token prediction, spell checking, and intelligent suggestions to enhance your writing experience.",
     "main": "index.js",
     "scripts": {
-        "test": "echo \"Error: no test specified\" && exit 1",
+        "test": "jest",
+        "test:watch": "jest --watch",
+        "test:coverage": "jest --coverage",
+        "test:verbose": "jest --verbose",
         "lint": "eslint static/**/*.js",
         "lint:fix": "eslint static/**/*.js --fix",
         "format": "prettier --write static/**/*.{js,css,html} *.{md,json}",
@@ -33,6 +36,41 @@
         "eslint-config-prettier": "^10.1.8",
         "eslint-plugin-prettier": "^5.5.3",
         "globals": "^16.3.0",
-        "prettier": "^3.6.2"
+        "prettier": "^3.6.2",
+        "jest": "^29.7.0",
+        "jest-environment-jsdom": "^29.7.0",
+        "@testing-library/jest-dom": "^6.1.4",
+        "@testing-library/dom": "^9.3.3"
+    },
+    "jest": {
+        "testEnvironment": "jsdom",
+        "setupFilesAfterEnv": [
+            "<rootDir>/tests/setup.js"
+        ],
+        "collectCoverageFrom": [
+            "static/**/*.js",
+            "!static/config*.js",
+            "!static/**/*.test.js"
+        ],
+        "coverageDirectory": "coverage",
+        "coverageReporters": [
+            "text",
+            "html",
+            "lcov"
+        ],
+        "testMatch": [
+            "<rootDir>/tests/**/*.test.js"
+        ],
+        "moduleFileExtensions": [
+            "js",
+            "json"
+        ],
+        "verbose": true,
+        "globals": {
+            "CONFIG": true,
+            "UTILS": true,
+            "VALIDATOR": true,
+            "ENV": true
+        }
     }
 }
