@@ -6,14 +6,6 @@ export default [
     // Base configuration for all JavaScript files
     {
         files: ["**/*.{js,mjs,cjs}"],
-        ignores: [
-            "node_modules/**",
-            "coverage/**",
-            "dist/**",
-            "build/**",
-            ".git/**",
-            "*.min.js"
-        ],
         languageOptions: {
             globals: {
                 ...globals.browser,

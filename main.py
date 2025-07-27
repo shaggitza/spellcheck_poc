@@ -23,16 +23,10 @@ except ImportError:
 
 app = FastAPI(title="Text Editor with Next Token Prediction and Spell Checking")
 
-# Database path - use mounted volume in production or local directory in development
-data_dir = os.getenv("FLY_APP_NAME") and "/data" or "."
-DB_PATH = os.path.join(data_dir, "spellcheck.db")
-
 # Create necessary directories
 os.makedirs("static", exist_ok=True)
 os.makedirs("templates", exist_ok=True)
 os.makedirs("text_files", exist_ok=True)
-# Ensure data directory exists for database
-os.makedirs(data_dir, exist_ok=True)
 
 # Initialize spell checkers
 pyspell_checker = SpellChecker()
@@ -59,6 +53,9 @@ if HUNSPELL_AVAILABLE:
 else:
     print("⚠️  Hunspell not available, using PySpellChecker only")
     hunspell_checker = None
+
+# Database path
+DB_PATH = "spellcheck.db"
 
 
 async def init_database():
@@ -637,6 +634,4 @@ async def websocket_endpoint(websocket: WebSocket):
 if __name__ == "__main__":
     import uvicorn
 
-    # Use PORT environment variable if available (for fly.io), otherwise default to 8000
-    port = int(os.getenv("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    uvicorn.run(app, host="0.0.0.0", port=8000)
