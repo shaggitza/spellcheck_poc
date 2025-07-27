@@ -21,6 +21,9 @@ const createMockConfig = () => ({
     },
     FILES: {
         EXTENSION: '.txt'
+    },
+    SPELL_CHECK: {
+        DEFAULT_LANGUAGE: 'en-US'
     }
 });
 

@@ -393,6 +393,15 @@ class PredictionEngine {
 
             this.predictionTimeout = this.setTimeoutSafe(() => {
                 try {
+                    // Re-check WebSocket connection before sending (connection might have changed)
+                    const currentWebsocket = this.getWebSocket();
+                    if (!currentWebsocket || currentWebsocket.readyState !== WebSocket.OPEN) {
+                        if (this.environment.isDevelopment()) {
+                            console.log('Cannot send prediction request - WebSocket disconnected during debounce');
+                        }
+                        return;
+                    }
+
                     const fullContent = this.getEditorContent();
                     const cursorPosition = this.getCursorPosition();
 
@@ -434,7 +443,7 @@ class PredictionEngine {
                         return;
                     }
 
-                                        websocket.send(JSON.stringify(message));
+                    currentWebsocket.send(JSON.stringify(message));
 
                     // Log network request in development
                     if (this.environment.isDevelopment()) {
