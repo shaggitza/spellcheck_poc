@@ -256,6 +256,19 @@ describe('PredictionEngine', () => {
         });
 
         test('should request prediction when conditions are met', () => {
+            // Ensure WebSocket is connected
+            mockWebSocket.readyState = WebSocket.OPEN;
+            mockDependencies.websocket.mockReturnValue(mockWebSocket);
+
+            // Mock isAtWordBoundary to return true
+            mockDependencies.isAtWordBoundary.mockReturnValue(true);
+
+            // Mock window.getSelection to return collapsed selection (no text selected)
+            global.window.getSelection = jest.fn(() => ({
+                rangeCount: 1,
+                getRangeAt: () => ({ collapsed: true })
+            }));
+
             // Mock setTimeoutSafe to execute callback immediately
             predictionEngine.setTimeoutSafe = jest.fn((callback, delay) => {
                 callback(); // Execute immediately
