@@ -178,6 +178,9 @@ pip install -r requirements-dev.txt  # For development tools
 # Install Node.js dependencies
 npm install
 
+# Validate your setup
+./validate-setup.sh
+
 # Run linting and tests
 npm run lint && npm test
 python -m pytest
