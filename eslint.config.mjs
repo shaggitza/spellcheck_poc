@@ -16,6 +16,8 @@ export default [
                 Utils: 'readonly',
                 Validator: 'readonly',
                 FileManager: 'readonly',
+            SpellChecker: 'readonly',
+            PredictionEngine: 'readonly',
                 bootstrap: 'readonly',
             },
             ecmaVersion: 2022,

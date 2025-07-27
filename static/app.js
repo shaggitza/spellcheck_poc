@@ -24,15 +24,12 @@ class TextEditor {
 
         // Initialize properties
         this.isConnected = false;
-        this.suggestionVisible = false;
-        this.currentPrediction = null;
         this.isTyping = false;
         this.actionsVisible = false;
         this.currentParagraph = null;
 
         // Timeouts for debouncing - use environment-aware delays
         this.saveTimeout = null;
-        this.predictionTimeout = null;
         this.typingTimeout = null;
         this.normalizeTimeout = null;
 
@@ -46,6 +43,7 @@ class TextEditor {
             this.initializeElements();
             this.initializeFileManager();
             this.initializeSpellChecker();
+            this.initializePredictionEngine();
             this.setupEventListeners();
             this.setupUrlHandling();
             this.setupDebouncedMethods();
@@ -72,10 +70,6 @@ class TextEditor {
                 this.normalizeEditorStructure();
             }
         }, CONFIG.TIMING.NORMALIZATION_DELAY);
-
-        this.debouncedPrediction = this.utils.debounce(() => {
-            this.requestPrediction();
-        }, CONFIG.TIMING.PREDICTION_DEBOUNCE);
     }
 
     /**
@@ -157,7 +151,6 @@ class TextEditor {
 
             // 2. Clear specific debounce timeouts
             this.clearTimeoutSafe(this.saveTimeout);
-            this.clearTimeoutSafe(this.predictionTimeout);
             this.clearTimeoutSafe(this.spellCheckTimeout);
             this.clearTimeoutSafe(this.typingTimeout);
             this.clearTimeoutSafe(this.normalizeTimeout);
@@ -177,17 +170,13 @@ class TextEditor {
             // 6. Clear DOM references to prevent circular references
             this.currentParagraph = null;
 
-            // 7. Clear data structures
-            this.currentPrediction = null;
-
-            // 8. Clean up modules
+            // 7. Clean up modules
             if (this.spellChecker) {
                 this.spellChecker.cleanup();
             }
 
             // 9. Reset state
             this.isConnected = false;
-            this.suggestionVisible = false;
             this.isTyping = false;
             this.actionsVisible = false;
 
@@ -219,16 +208,16 @@ class TextEditor {
         try {
             // Clear all debounce timeouts
             this.clearTimeoutSafe(this.saveTimeout);
-            this.clearTimeoutSafe(this.predictionTimeout);
             this.clearTimeoutSafe(this.typingTimeout);
             this.clearTimeoutSafe(this.normalizeTimeout);
 
             // Reset file-specific state
-            this.hideInlineSuggestion();
+            if (this.predictionEngine) {
+                this.predictionEngine.hideInlineSuggestion();
+                this.predictionEngine.clearPrediction();
+            }
             this.hideParagraphActions();
-            this.currentPrediction = null;
             this.isTyping = false;
-            this.suggestionVisible = false;
 
             // Clear spell checker state
             if (this.spellChecker) {
@@ -326,7 +315,7 @@ class TextEditor {
 
             // State management callbacks
             getIsTyping: () => this.isTyping,
-            getSuggestionVisible: () => this.suggestionVisible,
+            getSuggestionVisible: () => this.predictionEngine ? this.predictionEngine.isSuggestionVisible() : false,
 
             // FileManager integration
             fileManager: this.fileManager,
@@ -341,6 +330,35 @@ class TextEditor {
         });
     }
 
+    initializePredictionEngine() {
+        // Create PredictionEngine with dependencies
+        this.predictionEngine = new PredictionEngine({
+            // Dependencies
+            websocket: () => this.ws,
+            validator: this.validator,
+            errorHandler: this.errorHandler,
+            environment: this.environment,
+            utils: this.utils,
+
+            // DOM elements
+            textEditor: this.textEditor,
+            predictionText: this.predictionText,
+
+            // Required callbacks from TextEditor
+            getEditorContent: () => this.getEditorContent(),
+            getCursorPosition: () => this.getCursorPosition(),
+            setCursorPosition: (position) => this.setCursorPosition(position),
+            getParagraphContext: (content, cursor) => this.getParagraphContext(content, cursor),
+            isAtWordBoundary: () => this.isAtWordBoundary(),
+            handleTextChange: () => this.handleTextChange(),
+            clearTimeoutSafe: (timeoutId) => this.clearTimeoutSafe(timeoutId),
+            setTimeoutSafe: (callback, delay) => this.setTimeoutSafe(callback, delay),
+        });
+
+        this.predictionEngine.initialize();
+        console.log('✅ PredictionEngine initialized');
+    }
+
     setupEventListeners() {
         // Rich text editor events
         this.addEventListenerSafe(this.textEditor, 'input', () => this.handleTextChange());
@@ -349,7 +367,9 @@ class TextEditor {
         this.addEventListenerSafe(this.textEditor, 'paste', e => this.handlePaste(e));
         this.addEventListenerSafe(this.textEditor, 'blur', () => {
             this.setTimeoutSafe(() => {
-                this.hideInlineSuggestion();
+                if (this.predictionEngine) {
+                    this.predictionEngine.hideInlineSuggestion();
+                }
                 this.hideParagraphActions();
             }, CONFIG.TIMING.BLUR_HIDE_DELAY);
         });
@@ -398,17 +418,17 @@ class TextEditor {
         this.addEventListenerSafe(document, 'keydown', e => {
             if (e.key === 'ArrowRight' && e.ctrlKey) {
                 console.log('GLOBAL: Ctrl + Right Arrow detected', {
-                    suggestionVisible: this.suggestionVisible,
-                    currentPrediction: !!this.currentPrediction,
+                    suggestionVisible: this.predictionEngine ? this.predictionEngine.isSuggestionVisible() : false,
+                    currentPrediction: this.predictionEngine ? !!this.predictionEngine.getCurrentPrediction() : false,
                     activeElement: document.activeElement,
                     isInEditor: this.textEditor.contains(document.activeElement),
                 });
 
-                if (this.suggestionVisible && this.currentPrediction) {
+                if (this.predictionEngine && this.predictionEngine.isSuggestionVisible() && this.predictionEngine.getCurrentPrediction()) {
                     console.log('GLOBAL: Calling acceptPartialSuggestion');
                     e.preventDefault();
                     e.stopPropagation();
-                    this.acceptPartialSuggestion();
+                    this.predictionEngine.acceptPartialSuggestion();
                 }
             }
         });
@@ -416,7 +436,9 @@ class TextEditor {
         // Hide suggestion when clicking outside
         this.addEventListenerSafe(document, 'click', e => {
             if (!this.textEditor.contains(e.target)) {
-                this.hideInlineSuggestion();
+                if (this.predictionEngine) {
+                    this.predictionEngine.hideInlineSuggestion();
+                }
             }
 
             if (!this.paragraphActions.contains(e.target) && !this.textEditor.contains(e.target)) {
@@ -451,7 +473,9 @@ class TextEditor {
         // Focus the editor and request prediction + spell check
         this.textEditor.focus();
         this.setTimeoutSafe(() => {
-            this.requestPrediction();
+            if (this.predictionEngine) {
+                this.predictionEngine.requestPrediction();
+            }
             if (this.spellChecker) {
                 this.spellChecker.requestSpellCheck();
             }
@@ -532,7 +556,9 @@ class TextEditor {
         });
 
         // Hide suggestions and actions
-        this.hideInlineSuggestion();
+        if (this.predictionEngine) {
+            this.predictionEngine.hideInlineSuggestion();
+        }
         this.hideParagraphActions();
 
         console.log('Switched to dashboard mode');
@@ -622,11 +648,13 @@ class TextEditor {
                     break;
 
                 case CONFIG.EVENTS.WEBSOCKET.PREDICTION_RESPONSE:
-                    this.handlePredictionResponse(
-                        message.prediction,
-                        message.cursor_position,
-                        message.metadata
-                    );
+                    if (this.predictionEngine) {
+                        this.predictionEngine.handlePredictionResponse(
+                            message.prediction,
+                            message.cursor_position,
+                            message.metadata
+                        );
+                    }
                     break;
 
                 case CONFIG.EVENTS.WEBSOCKET.SPELL_CHECK_RESPONSE:
@@ -668,287 +696,13 @@ class TextEditor {
         }
     }
 
-    handlePredictionResponse(prediction, cursorPosition, metadata = {}) {
-        console.log('Received prediction:', { prediction, cursorPosition, metadata });
-
-        this.currentPrediction = {
-            text: prediction,
-            position: cursorPosition,
-            metadata: metadata,
-        };
-
-        // Update the bottom prediction display
-        this.updatePrediction(prediction);
-
-        // Show inline suggestion if we have a meaningful prediction
-        const currentCursorPos = this.getCursorPosition();
-        console.log(
-            'Current cursor position:',
-            currentCursorPos,
-            'Expected (relative):',
-            cursorPosition
-        );
-
-        // For contextual predictions, we're more lenient with cursor position matching
-        // since we're working with relative positions within paragraph context
-        if (
-            prediction &&
-            prediction.trim() &&
-            Math.abs(currentCursorPos - (metadata.original_cursor_position || cursorPosition)) <=
-            CONFIG.TEXT.MAX_CURSOR_POSITION_TOLERANCE
-        ) {
-            this.showInlineSuggestion(prediction);
-        } else {
-            console.log('Not showing suggestion:', {
-                hasPrediction: !!prediction,
-                hasContent: !!(prediction && prediction.trim()),
-                cursorMatch:
-                    Math.abs(
-                        currentCursorPos - (metadata.original_cursor_position || cursorPosition)
-                    ) <= 10,
-                currentPos: currentCursorPos,
-                expectedPos: metadata.original_cursor_position || cursorPosition,
-            });
-            this.hideInlineSuggestion();
-        }
-    }
-
-    showInlineSuggestion(prediction) {
-        if (!prediction || !prediction.trim()) {
-            this.hideInlineSuggestion();
-            return;
-        }
-
-        console.log('Showing inline suggestion:', prediction);
-
-        try {
-            const selection = window.getSelection();
-            if (selection.rangeCount === 0) return;
-
-            const range = selection.getRangeAt(0);
-
-            // Don't show prediction if user has an active selection (text is selected)
-            if (!range.collapsed) {
-                console.log('Skipping prediction - user has text selected');
-                return;
-            }
-
-            // Remove any existing inline suggestions
-            this.hideInlineSuggestion();
-
-            // Create a span element for the inline suggestion
-            const suggestionSpan = document.createElement('span');
-            suggestionSpan.className = CONFIG.CSS_CLASSES.INLINE_SUGGESTION;
-            suggestionSpan.textContent = prediction;
-            suggestionSpan.id = CONFIG.SELECTORS.CURRENT_SUGGESTION.slice(1); // Remove the #
-
-            // Make suggestion non-navigable and unselectable
-            suggestionSpan.style.userSelect = 'none';
-            suggestionSpan.style.pointerEvents = 'none';
-            suggestionSpan.contentEditable = false;
-
-            // Force clean styling to prevent inheritance from surrounding elements
-            suggestionSpan.style.background = 'transparent';
-            suggestionSpan.style.backgroundColor = 'transparent';
-            suggestionSpan.style.border = 'none';
-            suggestionSpan.style.borderBottom = 'none';
-            suggestionSpan.style.textDecoration = 'none';
-            suggestionSpan.style.color = '#9ca3af';
-            suggestionSpan.style.fontStyle = 'italic';
-            suggestionSpan.style.cursor = 'default';
-            suggestionSpan.style.boxShadow = 'none';
-            suggestionSpan.style.outline = 'none';
-
-            // Insert the suggestion at cursor position
-            range.insertNode(suggestionSpan);
-
-            // Move cursor back to before the suggestion
-            range.setStartBefore(suggestionSpan);
-            range.collapse(true);
-            selection.removeAllRanges();
-            selection.addRange(range);
-
-            this.suggestionVisible = true;
-
-            console.log('Inline suggestion displayed');
-        } catch (error) {
-            console.error('Error showing inline suggestion:', error);
-            this.hideInlineSuggestion();
-        }
-    }
-
-    hideInlineSuggestion() {
-        // Remove any existing inline suggestions
-        const existingSuggestion = document.getElementById(
-            CONFIG.SELECTORS.CURRENT_SUGGESTION.slice(1)
-        );
-        if (existingSuggestion) {
-            existingSuggestion.remove();
-        }
-
-        this.suggestionVisible = false;
-    }
-
-    acceptInlineSuggestion() {
-        if (!this.currentPrediction) return;
-
-        try {
-            const suggestionElement = document.getElementById('current-inline-suggestion');
-            if (suggestionElement) {
-                // Replace the suggestion element with actual text
-                const textNode = document.createTextNode(this.currentPrediction.text);
-                suggestionElement.parentNode.replaceChild(textNode, suggestionElement);
-
-                // Move cursor to end of inserted text
-                const selection = window.getSelection();
-                const range = document.createRange();
-                range.setStartAfter(textNode);
-                range.collapse(true);
-                selection.removeAllRanges();
-                selection.addRange(range);
-            }
-
-            this.hideInlineSuggestion();
-
-            // Clear spell check error badges since content has changed
-            if (this.spellChecker) {
-                this.spellChecker.clearSpellCheckBadges();
-            }
-
-            this.handleTextChange();
-
-            // Focus back on editor
-            this.textEditor.focus();
-        } catch (error) {
-            console.error('Error applying suggestion:', error);
-            // Fallback: just focus the editor
-            this.textEditor.focus();
-        }
-    }
-
-    acceptPartialSuggestion() {
-        console.log('acceptPartialSuggestion called', {
-            currentPrediction: this.currentPrediction,
-            suggestionVisible: this.suggestionVisible,
-        });
-
-        if (!this.currentPrediction) {
-            console.log('No current prediction available');
-            return;
-        }
-
-        try {
-            const suggestionElement = document.getElementById(
-                CONFIG.SELECTORS.CURRENT_SUGGESTION.slice(1)
-            );
-            console.log('Suggestion element found:', !!suggestionElement);
-
-            if (suggestionElement) {
-                const fullText = this.currentPrediction.text;
-
-                console.log('Full prediction text:', JSON.stringify(fullText));
-
-                // Don't trim the original text - preserve leading/trailing spaces
-                if (!fullText) {
-                    console.log('Prediction text is empty');
-                    return;
-                }
-
-                // Find the first word boundary, preserving any leading spaces
-                let firstWord = '';
-                let remainingText = '';
-
-                // Find the first whitespace character
-                const spaceIndex = fullText.search(/\s/);
-                if (spaceIndex === -1) {
-                    // No whitespace found, use entire text as first word
-                    firstWord = fullText;
-                    remainingText = '';
-                } else {
-                    // Take everything up to and including the first space
-                    firstWord = fullText.substring(0, spaceIndex + 1);
-                    // Take everything after the first space
-                    remainingText = fullText.substring(spaceIndex + 1);
-                }
-
-                console.log('Word extraction:', {
-                    originalText: JSON.stringify(fullText),
-                    firstWord: JSON.stringify(firstWord),
-                    remainingText: JSON.stringify(remainingText),
-                    remainingLength: remainingText.length,
-                });
-
-                if (!firstWord) {
-                    console.log('No first word extracted');
-                    return;
-                }
-
-                // Insert the first word as actual text
-                const textNode = document.createTextNode(firstWord);
-                suggestionElement.parentNode.insertBefore(textNode, suggestionElement);
-
-                // Handle remaining text
-                if (remainingText.length >= CONFIG.TEXT.MIN_REMAINING_SUGGESTION_LENGTH) {
-                    // Enough remaining text - update suggestion without new prediction request
-                    this.currentPrediction.text = remainingText;
-                    suggestionElement.textContent = remainingText;
-
-                    // Move cursor to between the inserted text and remaining suggestion
-                    const selection = window.getSelection();
-                    const range = document.createRange();
-                    range.setStartAfter(textNode);
-                    range.collapse(true);
-                    selection.removeAllRanges();
-                    selection.addRange(range);
-
-                    console.log('Kept remaining suggestion:', remainingText);
-                } else {
-                    // Not enough remaining text - hide suggestion and request new prediction
-                    this.hideInlineSuggestion();
-
-                    // Move cursor to end of inserted text
-                    const selection = window.getSelection();
-                    const range = document.createRange();
-                    range.setStartAfter(textNode);
-                    range.collapse(true);
-                    selection.removeAllRanges();
-                    selection.addRange(range);
-
-                    console.log('Remaining text too short, requesting new prediction');
-                    // Request new prediction after a short delay
-                    setTimeout(
-                        () => this.requestPrediction(),
-                        CONFIG.TIMING.SUGGESTION_DISPLAY_DELAY
-                    );
-                }
-
-                // Clear spell check error badges since content has changed
-                if (this.spellChecker) {
-                    this.spellChecker.clearSpellCheckBadges();
-                }
-
-                // CRITICAL FIX: Don't call handleTextChange() to avoid spell check interference
-                // Instead, manually trigger only the necessary save operation
-                this.showSaveStatus('saving', 'Saving...');
-                this.clearTimeoutSafe(this.saveTimeout);
-                this.saveTimeout = this.setTimeoutSafe(() => {
-                    this.fileManager.saveCurrentFile();
-                }, 1000);
-            }
-
-            // Focus back on editor
-            this.textEditor.focus();
-        } catch (error) {
-            console.error('Error applying partial suggestion:', error);
-            this.textEditor.focus();
-        }
-    }
-
     handleEditorClick(_e) {
         // Small delay to ensure cursor position is updated
         setTimeout(() => {
             console.log('Editor clicked, requesting prediction...');
-            this.requestPrediction();
+            if (this.predictionEngine) {
+                this.predictionEngine.requestPrediction();
+            }
         }, CONFIG.TIMING.CURSOR_POSITION_UPDATE_DELAY);
     }
 
@@ -1232,38 +986,9 @@ class TextEditor {
     }
 
     handleKeyDown(e) {
-        // Debug ALL key events to see what's happening
-        if (e.ctrlKey || e.key === 'ArrowRight') {
-            console.log('Key event detected:', {
-                key: e.key,
-                altKey: e.altKey,
-                ctrlKey: e.ctrlKey,
-                shiftKey: e.shiftKey,
-                suggestionVisible: this.suggestionVisible,
-                currentPrediction: !!this.currentPrediction,
-            });
-        }
-
-        // PRIORITY: Handle Ctrl + Right Arrow for partial suggestion acceptance
-        if (
-            e.key === 'ArrowRight' &&
-            e.ctrlKey &&
-            this.suggestionVisible &&
-            this.currentPrediction
-        ) {
-            console.log('Ctrl + Right Arrow - attempting partial acceptance');
-            e.preventDefault();
-            e.stopPropagation();
-            this.acceptPartialSuggestion();
-            return false; // Ensure event is completely stopped
-        }
-
-        // Prevent Ctrl + Right Arrow from moving between paragraphs when no suggestions
-        if (e.key === 'ArrowRight' && e.ctrlKey && !this.suggestionVisible) {
-            console.log('Ctrl + Right Arrow blocked - no suggestions visible');
-            e.preventDefault();
-            e.stopPropagation();
-            return false;
+        // Delegate prediction-related key events to PredictionEngine first
+        if (this.predictionEngine && this.predictionEngine.handleKeyEvent(e)) {
+            return; // Event was handled by PredictionEngine
         }
 
         // Handle paragraph structure preservation
@@ -1350,81 +1075,6 @@ class TextEditor {
                 }
             }
             return;
-        }
-
-        // Handle suggestion controls
-        if (this.suggestionVisible) {
-            // Debug key events when suggestion is visible
-            console.log('Processing key in suggestion controls:', {
-                key: e.key,
-                ctrlKey: e.ctrlKey,
-            });
-
-            switch (e.key) {
-                case 'Tab':
-                    e.preventDefault();
-                    this.acceptInlineSuggestion();
-                    break;
-                case 'Escape':
-                    e.preventDefault();
-                    this.hideInlineSuggestion();
-                    break;
-                case 'ArrowRight':
-                case 'ArrowLeft':
-                case 'ArrowUp':
-                case 'ArrowDown':
-                    // Regular arrow keys do nothing with predictions
-                    // Ctrl + Right is handled at top of function
-                    break;
-                case ' ':
-                case 'Enter':
-                case 'Backspace':
-                case 'Delete':
-                    // Hide suggestion on these keys
-                    this.hideInlineSuggestion();
-                    break;
-            }
-        }
-    }
-
-    showInlineSuggestion(prediction, _cursorPosition) {
-        if (!prediction || !prediction.trim()) {
-            this.hideInlineSuggestion();
-            return;
-        }
-
-        console.log('Showing inline suggestion:', prediction);
-
-        try {
-            const selection = window.getSelection();
-            if (selection.rangeCount === 0) return;
-
-            const range = selection.getRangeAt(0);
-
-            // Remove any existing inline suggestions
-            this.hideInlineSuggestion();
-
-            // Create a span element for the inline suggestion
-            const suggestionSpan = document.createElement('span');
-            suggestionSpan.className = 'inline-suggestion-text';
-            suggestionSpan.textContent = prediction;
-            suggestionSpan.id = 'current-inline-suggestion';
-
-            // Insert the suggestion at cursor position
-            range.insertNode(suggestionSpan);
-
-            // Move cursor back to before the suggestion
-            range.setStartBefore(suggestionSpan);
-            range.collapse(true);
-            selection.removeAllRanges();
-            selection.addRange(range);
-
-            this.suggestionVisible = true;
-
-            console.log('Inline suggestion displayed');
-        } catch (error) {
-            console.error('Error showing inline suggestion:', error);
-            this.hideInlineSuggestion();
         }
     }
 
@@ -1651,7 +1301,10 @@ class TextEditor {
             }, CONFIG.TIMING.NORMALIZATION_DELAY);
 
             // Request prediction while typing
-            this.requestPrediction();
+            if (this.predictionEngine) {
+                this.predictionEngine.setTypingState(true);
+                this.predictionEngine.requestPrediction();
+            }
 
             // Delay spell check until user stops typing to avoid cursor jumping
             if (this.spellChecker) {
@@ -1662,6 +1315,10 @@ class TextEditor {
             this.clearTimeoutSafe(this.typingTimeout);
             this.typingTimeout = this.setTimeoutSafe(() => {
                 this.isTyping = false;
+                // Notify PredictionEngine about typing state change
+                if (this.predictionEngine) {
+                    this.predictionEngine.setTypingState(false);
+                }
             // Run normalization after typing stops
                 this.setTimeoutSafe(
                     () => this.normalizeEditorStructure(),
@@ -1693,7 +1350,7 @@ class TextEditor {
             }
 
             // CRITICAL: Skip normalization if there's an active inline suggestion
-            if (this.suggestionVisible && document.getElementById('current-inline-suggestion')) {
+            if (this.predictionEngine && this.predictionEngine.isSuggestionVisible() && document.getElementById('current-inline-suggestion')) {
                 console.log('Skipping normalization - inline suggestion is active');
                 return;
             }
@@ -1906,118 +1563,6 @@ class TextEditor {
         }
     }
 
-    requestPrediction() {
-        try {
-            // Start performance timer in development
-            const timer = this.environment.startTimer('prediction-request');
-
-            if (!this.fileManager.hasCurrentFile() || !this.isConnected) {
-                if (this.environment.isDevelopment()) {
-                    console.log('Cannot request prediction:', {
-                        currentFile: this.fileManager.getCurrentFile(),
-                        isConnected: this.isConnected,
-                    });
-                }
-                return;
-            }
-
-            // Check if user has text selected - don't predict if they do
-            const selection = window.getSelection();
-            if (selection.rangeCount > 0 && !selection.getRangeAt(0).collapsed) {
-                if (this.environment.isDevelopment()) {
-                    console.log('Skipping prediction - user has text selected');
-                }
-                this.hideInlineSuggestion();
-                this.updatePrediction(''); // Clear bottom prediction display
-                return;
-            }
-
-            // Check if we're at a word boundary - only predict at word boundaries
-            if (!this.isAtWordBoundary()) {
-                if (this.environment.isDevelopment()) {
-                    console.log('Skipping prediction - cursor is in middle of word');
-                }
-                this.hideInlineSuggestion();
-                this.updatePrediction(''); // Clear bottom prediction display
-                return;
-            }
-
-            // Hide current suggestion when requesting new one
-            this.hideInlineSuggestion();
-
-            // Debounce prediction requests - longer delay if user is actively typing
-            this.clearTimeoutSafe(this.predictionTimeout);
-            const delay = this.isTyping
-                ? CONFIG.TIMING.PREDICTION_DEBOUNCE_TYPING
-                : CONFIG.TIMING.PREDICTION_DEBOUNCE;
-
-            this.predictionTimeout = this.setTimeoutSafe(() => {
-                try {
-                    const fullContent = this.getEditorContent();
-                    const cursorPosition = this.getCursorPosition();
-
-                    // Extract structured paragraph context on frontend
-                    const context = this.getParagraphContext(fullContent, cursorPosition);
-
-                    if (this.environment.isDevelopment()) {
-                        console.log('Sending structured prediction request:', {
-                            prevContextLength: context.prevContext.length,
-                            currentTextLength: context.currentText.length,
-                            afterContextLength: context.afterContext.length,
-                            cursor: context.cursor,
-                            paragraphIndex: context.paragraphIndex,
-                        });
-                    }
-
-                    const message = {
-                        type: 'prediction_request',
-                        prevContext: context.prevContext,
-                        currentText: context.currentText,
-                        afterContext: context.afterContext,
-                        cursor: context.cursor,
-                        metadata: {
-                            paragraph_index: context.paragraphIndex,
-                            total_paragraphs: context.totalParagraphs,
-                            original_cursor_position: cursorPosition,
-                        },
-                    };
-
-                    // Validate the message before sending
-                    const validation = this.validator.validateWebSocketMessage(message);
-                    if (!validation.isValid) {
-                        const errorMessage = this.validator.formatErrors(validation);
-                        this.errorHandler.handleError(
-                            new Error(errorMessage),
-                            'validation',
-                            'Invalid prediction request format'
-                        );
-                        return;
-                    }
-
-                    this.ws.send(JSON.stringify(message));
-
-                    // Log network request in development
-                    if (this.environment.isDevelopment()) {
-                        this.environment.logNetworkRequest(
-                            'WS_SEND',
-                            'prediction_request',
-                            timer.end(),
-                            true
-                        );
-                    }
-                } catch (error) {
-                    this.errorHandler.handleError(
-                        error,
-                        'prediction',
-                        'Failed to send prediction request'
-                    );
-                }
-            }, delay);
-        } catch (error) {
-            this.errorHandler.handleError(error, 'prediction', 'Error in requestPrediction');
-        }
-    }
-
     getCursorPosition() {
         try {
             const selection = window.getSelection();
@@ -2104,14 +1649,6 @@ class TextEditor {
             selection.addRange(range);
         } catch (error) {
             console.error('Error setting cursor position:', error);
-        }
-    }
-
-    updatePrediction(prediction) {
-        if (prediction && prediction.trim()) {
-            this.predictionText.textContent = prediction;
-        } else {
-            this.predictionText.textContent = 'No prediction (empty line or no context)';
         }
     }
 
