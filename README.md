@@ -288,10 +288,12 @@ spellcheck_poc/
 This application is ready for deployment to [Fly.io](https://fly.io) with the included `fly.toml` configuration file.
 
 #### Prerequisites
+
 - Install the [Fly CLI](https://fly.io/docs/hands-on/install-flyctl/)
 - Sign up for a [Fly.io account](https://fly.io/app/sign-up)
 
 #### Quick Deploy
+
 ```bash
 # Authenticate with Fly.io
 fly auth login
@@ -307,6 +309,7 @@ fly deploy
 ```
 
 #### Configuration Details
+
 - **Port**: Application runs on port 8080 (configured in `fly.toml`)
 - **Database**: SQLite database persisted on a mounted volume at `/data`
 - **Memory**: 512MB allocated (can be adjusted in `fly.toml`)
@@ -314,13 +317,17 @@ fly deploy
 - **Auto-scaling**: Enabled with auto-stop/start machines
 
 #### Environment Variables
+
 The application automatically detects the Fly.io environment and adjusts:
+
 - Uses `PORT` environment variable for the server port
 - Database stored in `/data` directory when `FLY_APP_NAME` is present
 - Falls back to local directory for development
 
 #### Monitoring
+
 After deployment, you can:
+
 ```bash
 # View logs
 fly logs
