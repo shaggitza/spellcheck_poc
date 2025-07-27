@@ -403,6 +403,64 @@ body {
     align-items: center;
 }
 
+/* Feature toggle buttons */
+#predictionToggleBtn,
+#spellCheckToggleBtn {
+    cursor: pointer !important;
+    pointer-events: auto !important;
+    transition: all 0.2s ease;
+}
+
+#predictionToggleBtn.enabled {
+    background-color: #0dcaf0;
+    border-color: #0dcaf0;
+    color: #000;
+}
+
+#predictionToggleBtn.disabled {
+    background-color: transparent;
+    border-color: #6c757d;
+    color: #6c757d;
+}
+
+#spellCheckToggleBtn.enabled {
+    background-color: #ffc107;
+    border-color: #ffc107;
+    color: #000;
+}
+
+#spellCheckToggleBtn.disabled {
+    background-color: transparent;
+    border-color: #6c757d;
+    color: #6c757d;
+}
+
+/* Hover effects for enabled state */
+#predictionToggleBtn.enabled:hover {
+    background-color: #31d2f2;
+    border-color: #25cff2;
+    color: #000;
+}
+
+#spellCheckToggleBtn.enabled:hover {
+    background-color: #ffcd39;
+    border-color: #ffc720;
+    color: #000;
+}
+
+/* Hover effects for disabled state */
+#predictionToggleBtn.disabled:hover {
+    background-color: #e9ecef;
+    border-color: #0dcaf0;
+    color: #0dcaf0;
+}
+
+#spellCheckToggleBtn.disabled:hover {
+    background-color: #fff3cd;
+    border-color: #ffc107;
+    color: #ffc107;
+}
+
 #saveStatus {
     font-size: 12px;
 }

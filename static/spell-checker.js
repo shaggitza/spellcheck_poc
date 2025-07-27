@@ -123,14 +123,15 @@ class SpellChecker {
                 return;
             }
 
-            // CRITICAL: Skip spell check if inline suggestion is active
-            if (
-                this.getSuggestionVisible() &&
-                document.getElementById(this.config.SELECTORS.CURRENT_SUGGESTION.slice(1))
-            ) {
-                console.log('Skipping spell check request - inline suggestion is active');
-                return;
-            }
+            // MODIFIED: Don't skip spell check just because prediction is active
+            // Both systems should be able to work in parallel
+            // if (
+            //     this.getSuggestionVisible() &&
+            //     document.getElementById(this.config.SELECTORS.CURRENT_SUGGESTION.slice(1))
+            // ) {
+            //     console.log('Skipping spell check request - inline suggestion is active');
+            //     return;
+            // }
 
             // Clear existing timeout
             this.clearTimeoutSafe(this.spellCheckTimeout);
@@ -138,16 +139,16 @@ class SpellChecker {
             // Debounce spell check requests
             this.spellCheckTimeout = this.setTimeoutSafe(() => {
                 try {
-                    // Double-check suggestion status before sending request
-                    if (
-                        this.getSuggestionVisible() &&
-                        document.getElementById(this.config.SELECTORS.CURRENT_SUGGESTION.slice(1))
-                    ) {
-                        console.log(
-                            'Skipping delayed spell check - inline suggestion is still active'
-                        );
-                        return;
-                    }
+                    // MODIFIED: Allow spell check even if prediction is active
+                    // if (
+                    //     this.getSuggestionVisible() &&
+                    //     document.getElementById(this.config.SELECTORS.CURRENT_SUGGESTION.slice(1))
+                    // ) {
+                    //     console.log(
+                    //         'Skipping delayed spell check - inline suggestion is still active'
+                    //     );
+                    //     return;
+                    // }
 
                     const content = this.getEditorContent();
                     const lines = content.split('\n\n').map(p => p.replace(/\n/g, ' ')); // Convert paragraphs to lines
@@ -210,23 +211,30 @@ class SpellChecker {
 
         this.spellErrors = errors;
 
-        // CRITICAL: Skip spell error highlighting if inline suggestion is active
-        if (this.getSuggestionVisible() && document.getElementById('current-inline-suggestion')) {
-            console.log('Skipping spell error highlighting - inline suggestion is active');
-            return;
+        // MODIFIED: Allow highlighting even if prediction is active, but be more careful about DOM manipulation
+        const hasActivePrediction = this.getSuggestionVisible() && document.getElementById('current-inline-suggestion');
+        if (hasActivePrediction) {
+            console.log('Inline suggestion is active but still highlighting spell errors (with caution)');
         }
 
         // If user is actively typing, delay highlighting to avoid cursor jumping
         if (this.getIsTyping()) {
-            console.log('User is typing, delaying spell error highlighting for 500ms');
-            setTimeout(() => {
-                if (!this.getIsTyping() && !this.getSuggestionVisible()) {
-                    console.log('Typing stopped and no active suggestion, now highlighting errors');
+            console.log('User is typing, delaying spell error highlighting');
+            // Use a longer delay that accounts for the typing timeout (1000ms) plus buffer
+            this.clearTimeoutSafe(this.highlightingTimeout);
+            this.highlightingTimeout = this.setTimeoutSafe(() => {
+                if (!this.getIsTyping()) {
+                    console.log('Typing stopped, now highlighting errors');
                     this.highlightSpellingErrors();
                 } else {
-                    console.log('Still typing or suggestion active, skipping delayed highlighting');
+                    console.log('Still typing, retrying highlighting in 200ms');
+                    // Retry with shorter delay if still typing
+                    this.highlightingTimeout = this.setTimeoutSafe(() => {
+                        console.log('Force highlighting spell errors after extended delay');
+                        this.highlightSpellingErrors();
+                    }, 200);
                 }
-            }, 500);
+            }, 1200); // 1000ms typing timeout + 200ms buffer
         } else {
             console.log('User not typing, highlighting errors immediately');
             this.highlightSpellingErrors();
@@ -245,10 +253,10 @@ class SpellChecker {
             isRetry
         );
 
-        // CRITICAL: Skip highlighting if inline suggestion is active
-        if (this.getSuggestionVisible() && document.getElementById('current-inline-suggestion')) {
-            console.log('Skipping spell error highlighting - inline suggestion is active');
-            return;
+        // MODIFIED: Allow highlighting even if prediction is active in normal highlighting
+        const hasActivePrediction = this.getSuggestionVisible() && document.getElementById('current-inline-suggestion');
+        if (hasActivePrediction) {
+            console.log('Inline suggestion is active but still highlighting spell errors (with caution)');
         }
 
         // Save current cursor position before DOM manipulation

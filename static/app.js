@@ -27,6 +27,8 @@ class TextEditor {
         this.isTyping = false;
         this.actionsVisible = false;
         this.currentParagraph = null;
+        this.spellCheckingEnabled = true;
+        this.predictionEnabled = true;
 
         // Timeouts for debouncing - use environment-aware delays
         this.saveTimeout = null;
@@ -44,6 +46,11 @@ class TextEditor {
             this.initializeFileManager();
             this.initializeSpellChecker();
             this.initializePredictionEngine();
+
+            // Initialize toggle button states after engines are created
+            this.updateToggleButton('spellCheck', this.spellCheckingEnabled);
+            this.updateToggleButton('prediction', this.predictionEnabled);
+
             this.setupEventListeners();
             this.setupUrlHandling();
             this.setupDebouncedMethods();
@@ -256,7 +263,18 @@ class TextEditor {
         this.spellCheckerEngine = this.utils.queryElement('#spellCheckerEngine');
         this.spellCheckerLanguage = this.utils.queryElement('#spellCheckerLanguage');
         this.spellCheckEnabledInput = this.utils.queryElement('#spellCheckEnabled');
+        this.predictionEnabledInput = this.utils.queryElement('#predictionEnabled');
         this.saveSettingsBtn = this.utils.queryElement('#saveSettingsBtn');
+
+        // Feature toggle buttons
+        this.predictionToggleBtn = this.utils.queryElement('#predictionToggleBtn');
+        this.spellCheckToggleBtn = this.utils.queryElement('#spellCheckToggleBtn');
+        this.predictionToggleIcon = this.utils.queryElement('#predictionToggleIcon');
+        this.spellCheckToggleIcon = this.utils.queryElement('#spellCheckToggleIcon');
+
+        // Initialize toggle button states
+        this.updateToggleButton('prediction', this.predictionEnabled);
+        this.updateToggleButton('spellCheck', this.spellCheckingEnabled);
     }
 
     initializeFileManager() {
@@ -402,6 +420,14 @@ class TextEditor {
         // Settings management
         if (this.saveSettingsBtn) {
             this.addEventListenerSafe(this.saveSettingsBtn, 'click', () => this.saveSettings());
+        }
+
+        // Feature toggle buttons
+        if (this.predictionToggleBtn) {
+            this.addEventListenerSafe(this.predictionToggleBtn, 'click', () => this.togglePredictions());
+        }
+        if (this.spellCheckToggleBtn) {
+            this.addEventListenerSafe(this.spellCheckToggleBtn, 'click', () => this.toggleSpellCheck());
         }
 
         // Paragraph action buttons
@@ -578,6 +604,9 @@ class TextEditor {
                 console.log('WebSocket connected');
                 this.isConnected = true;
                 this.updateConnectionStatus(CONFIG.CSS_CLASSES.CONNECTION_CONNECTED);
+                
+                // Load settings from server after connection is established
+                this.loadSettings();
             };
 
             this.ws.onmessage = event => {
@@ -1835,7 +1864,39 @@ class TextEditor {
                     this.spellCheckingEnabled = settings.spell_check_enabled;
                 }
 
+                if (
+                    this.predictionEnabledInput &&
+                    typeof settings.prediction_enabled === 'boolean'
+                ) {
+                    this.predictionEnabledInput.checked = settings.prediction_enabled;
+                    this.predictionEnabled = settings.prediction_enabled;
+                }
+
+                if (
+                    this.predictionEnabledInput &&
+                    typeof settings.prediction_enabled === 'boolean'
+                ) {
+                    this.predictionEnabledInput.checked = settings.prediction_enabled;
+                    this.predictionEnabled = settings.prediction_enabled;
+                }
+
+                // Update toggle button states based on loaded settings
+                this.updateToggleButton('spellCheck', this.spellCheckingEnabled);
+                this.updateToggleButton('prediction', this.predictionEnabled);
+
+                // Apply settings to engines
+                if (this.spellChecker) {
+                    this.spellChecker.setSpellCheckingEnabled(this.spellCheckingEnabled);
+                }
+                if (this.predictionEngine) {
+                    this.predictionEngine.setPredictionEnabled(this.predictionEnabled);
+                }
+
                 console.log('✅ Settings loaded:', settings);
+                
+                // Initialize toggle button states
+                this.updateToggleButton('spellCheck', this.spellCheckingEnabled);
+                this.updateToggleButton('prediction', this.predictionEnabled);
             }
         } catch (error) {
             console.error('Failed to load settings:', error);
@@ -1860,6 +1921,11 @@ class TextEditor {
                 this.spellCheckingEnabled = this.spellCheckEnabledInput.checked;
             }
 
+            if (this.predictionEnabledInput) {
+                settings.prediction_enabled = this.predictionEnabledInput.checked;
+                this.predictionEnabled = this.predictionEnabledInput.checked;
+            }
+
             // Validate settings before sending
             const validationRules = {};
             if (settings.spell_checker_engine !== undefined) {
@@ -1870,6 +1936,12 @@ class TextEditor {
             }
             if (settings.spell_check_enabled !== undefined) {
                 validationRules.spell_check_enabled = 'boolean';
+            }
+            if (settings.prediction_enabled !== undefined) {
+                validationRules.prediction_enabled = 'boolean';
+            }
+            if (settings.prediction_enabled !== undefined) {
+                validationRules.prediction_enabled = 'boolean';
             }
 
             const validation = this.validator.validateObject(settings, validationRules);
@@ -1905,8 +1977,22 @@ class TextEditor {
 
                 // Re-run spell check to apply new settings
                 if (this.spellChecker) {
+                    this.spellChecker.setSpellCheckingEnabled(this.spellCheckingEnabled);
                     this.spellChecker.requestSpellCheck();
                 }
+
+                // Apply prediction settings
+                if (this.predictionEngine) {
+                    this.predictionEngine.setPredictionEnabled(this.predictionEnabled);
+                }
+
+                // Update toggle button states
+                this.updateToggleButton('spellCheck', this.spellCheckingEnabled);
+                this.updateToggleButton('prediction', this.predictionEnabled);
+
+                // Update toggle button states
+                this.updateToggleButton('spellCheck', this.spellCheckingEnabled);
+                this.updateToggleButton('prediction', this.predictionEnabled);
             } else {
                 this.errorHandler.showNotification('Failed to save settings', 'error');
             }
@@ -1945,6 +2031,97 @@ class TextEditor {
 
         this.ws.send(JSON.stringify(message));
         console.log('Add word message sent successfully');
+    }
+
+    /**
+     * Toggle prediction functionality on/off
+     */
+    togglePredictions() {
+        this.predictionEnabled = !this.predictionEnabled;
+        
+        if (this.predictionEngine) {
+            this.predictionEngine.setPredictionEnabled(this.predictionEnabled);
+        }
+        
+        this.updateToggleButton('prediction', this.predictionEnabled);
+        this.saveSetting('prediction_enabled', this.predictionEnabled);
+        
+        console.log(`Predictions ${this.predictionEnabled ? 'enabled' : 'disabled'}`);
+    }
+
+    /**
+     * Toggle spell checking functionality on/off  
+     */
+    toggleSpellCheck() {
+        this.spellCheckingEnabled = !this.spellCheckingEnabled;
+        
+        if (this.spellChecker) {
+            this.spellChecker.setSpellCheckingEnabled(this.spellCheckingEnabled);
+        }
+        
+        this.updateToggleButton('spellCheck', this.spellCheckingEnabled);
+        this.saveSetting('spell_check_enabled', this.spellCheckingEnabled);
+        
+        console.log(`Spell checking ${this.spellCheckingEnabled ? 'enabled' : 'disabled'}`);
+    }
+
+    /**
+     * Update the visual state of toggle buttons
+     */
+    updateToggleButton(type, enabled) {
+        let button, icon;
+        
+        if (type === 'prediction') {
+            button = this.predictionToggleBtn;
+            icon = this.predictionToggleIcon;
+        } else if (type === 'spellCheck') {
+            button = this.spellCheckToggleBtn;
+            icon = this.spellCheckToggleIcon;
+        }
+        
+        if (!button || !icon) return;
+        
+        // Ensure button is never actually disabled (always clickable)
+        button.removeAttribute('disabled');
+        button.disabled = false;
+        
+        if (enabled) {
+            button.classList.remove('disabled');
+            button.classList.add('enabled');
+            icon.textContent = type === 'prediction' ? '🔮' : '📝';
+            button.title = `Disable ${type === 'prediction' ? 'AI Predictions' : 'Spell Checking'}`;
+        } else {
+            button.classList.remove('enabled');
+            button.classList.add('disabled');
+            icon.textContent = type === 'prediction' ? '🚫' : '❌';
+            button.title = `Enable ${type === 'prediction' ? 'AI Predictions' : 'Spell Checking'}`;
+        }
+        
+        console.log(`Toggle button updated: ${type} = ${enabled ? 'enabled' : 'disabled'} (clickable: true)`);
+    }
+
+    /**
+     * Save individual setting to server
+     */
+    async saveSetting(key, value) {
+        try {
+            const settings = { [key]: value };
+            
+            const response = await fetch('/api/settings', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ settings }),
+            });
+
+            const data = await response.json();
+            if (!data.success) {
+                console.error('Failed to save setting:', key, value);
+            }
+        } catch (error) {
+            console.error('Error saving setting:', error);
+        }
     }
 }
 

@@ -39,6 +39,7 @@ class PredictionEngine {
         this.predictionTimeout = null;
         this.isTyping = false;
         this.preserveSuggestion = false; // Flag to preserve suggestion during partial acceptance
+        this.predictionEnabled = true; // Whether prediction is enabled
         
         console.log('✅ PredictionEngine initialized');
     }
@@ -344,6 +345,16 @@ class PredictionEngine {
      */
     requestPrediction() {
         try {
+            // Skip if prediction is disabled
+            if (!this.predictionEnabled) {
+                if (this.environment.isDevelopment()) {
+                    console.log('Skipping prediction - predictions disabled');
+                }
+                this.hideInlineSuggestion();
+                this.updatePrediction('Predictions disabled');
+                return;
+            }
+
             // Start performance timer in development
             const timer = this.environment.startTimer('prediction-request');
 
@@ -506,6 +517,30 @@ class PredictionEngine {
         this.currentPrediction = null;
         this.hideInlineSuggestion();
         this.updatePrediction('');
+    }
+
+    /**
+     * Enable or disable predictions
+     */
+    setPredictionEnabled(enabled) {
+        this.predictionEnabled = enabled;
+        
+        if (!enabled) {
+            // Hide any active suggestions and clear prediction
+            this.clearPrediction();
+        } else {
+            // Re-request prediction if enabled and we have content
+            if (this.getEditorContent && this.getEditorContent().trim()) {
+                this.requestPrediction();
+            }
+        }
+    }
+
+    /**
+     * Get current prediction enabled state
+     */
+    isPredictionEnabled() {
+        return this.predictionEnabled;
     }
 
     /**
