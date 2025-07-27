@@ -18,6 +18,19 @@ echo "📋 Checking Node.js version..."
 node_version=$(node --version)
 echo "✅ Node.js version: $node_version"
 
+# Install dependencies if not present
+echo "📋 Installing dependencies..."
+if [ ! -d "node_modules" ]; then
+    echo "Installing frontend dependencies..."
+    npm install
+fi
+
+# Check if flake8 is available
+if ! command -v python3 -m flake8 >/dev/null 2>&1 && ! python3 -c "import flake8" 2>/dev/null; then
+    echo "Installing backend dependencies..."
+    pip install -r requirements-dev.txt
+fi
+
 # Check Python dependencies
 echo "📋 Checking Python dependencies..."
 if python3 -c "import main; print('Backend imports successfully')" 2>/dev/null; then
@@ -73,7 +86,9 @@ echo "🎉 All checks passed! Your development environment is ready."
 echo
 echo "Next steps:"
 echo "  • Run tests: npm test && python -m pytest" 
-echo "  • Check code quality: npm run lint && flake8 ."
+echo "  • Check code quality: npm run lint"
+echo "  • Check frontend: npm run lint:frontend"
+echo "  • Check backend: npm run lint:backend"  
 echo "  • Start the application: python main.py"
 echo "  • Visit: http://localhost:8000"
 echo

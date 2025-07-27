@@ -2,6 +2,18 @@
 
 This project now has clearly separated linting and formatting workflows for frontend and backend code.
 
+## Setup
+
+Before running any linting or formatting commands, make sure to install the required dependencies:
+
+```bash
+# Install frontend dependencies
+npm install
+
+# Install backend dependencies  
+pip install -r requirements-dev.txt
+```
+
 ## Frontend (JavaScript/CSS/HTML)
 
 ### Linting
