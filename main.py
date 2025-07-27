@@ -12,7 +12,11 @@ import asyncio
 import re
 import hashlib
 from spellchecker import SpellChecker
-import hunspell
+try:
+    import hunspell
+    HUNSPELL_AVAILABLE = True
+except ImportError:
+    HUNSPELL_AVAILABLE = False
 
 app = FastAPI(title="Text Editor with Next Token Prediction and Spell Checking")
 
@@ -26,18 +30,22 @@ pyspell_checker = SpellChecker()
 hunspell_checker = None
 
 # Try to initialize Hunspell with fallback
-try:
-    hunspell_checker = hunspell.HunSpell('/usr/share/hunspell/en_US.dic', '/usr/share/hunspell/en_US.aff')
-    print("✅ Hunspell initialized successfully")
-except Exception as e:
-    print(f"⚠️  Hunspell initialization failed: {e}")
+if HUNSPELL_AVAILABLE:
     try:
-        # Try alternative paths
-        hunspell_checker = hunspell.HunSpell('/usr/share/myspell/en_US.dic', '/usr/share/myspell/en_US.aff')
-        print("✅ Hunspell initialized with myspell path")
-    except Exception as e2:
-        print(f"⚠️  Hunspell fallback failed: {e2}")
-        hunspell_checker = None
+        hunspell_checker = hunspell.HunSpell('/usr/share/hunspell/en_US.dic', '/usr/share/hunspell/en_US.aff')
+        print("✅ Hunspell initialized successfully")
+    except Exception as e:
+        print(f"⚠️  Hunspell initialization failed: {e}")
+        try:
+            # Try alternative paths
+            hunspell_checker = hunspell.HunSpell('/usr/share/myspell/en_US.dic', '/usr/share/myspell/en_US.aff')
+            print("✅ Hunspell initialized with myspell path")
+        except Exception as e2:
+            print(f"⚠️  Hunspell fallback failed: {e2}")
+            hunspell_checker = None
+else:
+    print("⚠️  Hunspell not available, using PySpellChecker only")
+    hunspell_checker = None
 
 # Database path
 DB_PATH = "spellcheck.db"
@@ -128,7 +136,7 @@ async def spell_check_word_with_engine(word: str, engine: str = 'pyspellchecker'
     Check if a word is spelled correctly using the specified engine
     Returns (is_correct, suggestions_list)
     """
-    if engine == 'hunspell' and hunspell_checker:
+    if engine == 'hunspell' and hunspell_checker and HUNSPELL_AVAILABLE:
         try:
             is_correct = hunspell_checker.spell(word)
             if not is_correct:
