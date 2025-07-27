@@ -71,6 +71,7 @@ export default [
                 Validator: "readonly",
                 Utils: "readonly",
                 FileManager: "readonly",
+            SpellChecker: "readonly",
                 // Bootstrap globals
                 bootstrap: "readonly",
                 // Typo fixes

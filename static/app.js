@@ -26,16 +26,13 @@ class TextEditor {
         this.isConnected = false;
         this.suggestionVisible = false;
         this.currentPrediction = null;
-        this.spellErrors = {};
         this.isTyping = false;
         this.actionsVisible = false;
         this.currentParagraph = null;
-        this.spellCheckingEnabled = true;
 
         // Timeouts for debouncing - use environment-aware delays
         this.saveTimeout = null;
         this.predictionTimeout = null;
-        this.spellCheckTimeout = null;
         this.typingTimeout = null;
         this.normalizeTimeout = null;
 
@@ -48,6 +45,7 @@ class TextEditor {
         try {
             this.initializeElements();
             this.initializeFileManager();
+            this.initializeSpellChecker();
             this.setupEventListeners();
             this.setupUrlHandling();
             this.setupDebouncedMethods();
@@ -74,10 +72,6 @@ class TextEditor {
                 this.normalizeEditorStructure();
             }
         }, CONFIG.TIMING.NORMALIZATION_DELAY);
-
-        this.debouncedSpellCheck = this.utils.debounce(() => {
-            this.requestSpellCheck();
-        }, CONFIG.TIMING.SPELL_CHECK_DEBOUNCE);
 
         this.debouncedPrediction = this.utils.debounce(() => {
             this.requestPrediction();
@@ -184,10 +178,14 @@ class TextEditor {
             this.currentParagraph = null;
 
             // 7. Clear data structures
-            this.spellErrors = {};
             this.currentPrediction = null;
 
-            // 8. Reset state
+            // 8. Clean up modules
+            if (this.spellChecker) {
+                this.spellChecker.cleanup();
+            }
+
+            // 9. Reset state
             this.isConnected = false;
             this.suggestionVisible = false;
             this.isTyping = false;
@@ -222,7 +220,6 @@ class TextEditor {
             // Clear all debounce timeouts
             this.clearTimeoutSafe(this.saveTimeout);
             this.clearTimeoutSafe(this.predictionTimeout);
-            this.clearTimeoutSafe(this.spellCheckTimeout);
             this.clearTimeoutSafe(this.typingTimeout);
             this.clearTimeoutSafe(this.normalizeTimeout);
 
@@ -230,9 +227,13 @@ class TextEditor {
             this.hideInlineSuggestion();
             this.hideParagraphActions();
             this.currentPrediction = null;
-            this.spellErrors = {};
             this.isTyping = false;
             this.suggestionVisible = false;
+
+            // Clear spell checker state
+            if (this.spellChecker) {
+                this.spellChecker.clearSpellCheckState();
+            }
 
             if (this.environment.isDevelopment()) {
                 console.log('🧹 File state cleaned up for file switch');
@@ -300,6 +301,43 @@ class TextEditor {
             getEditorContent: () => this.getEditorContent(),
             setEditorContent: (content) => this.setEditorContent(content),
             getCursorPosition: () => this.getCursorPosition(),
+        });
+    }
+
+    initializeSpellChecker() {
+        // Create SpellChecker with dependencies
+        this.spellChecker = new SpellChecker({
+            // Dependencies
+            utils: this.utils,
+            validator: this.validator,
+            errorHandler: this.errorHandler,
+            environment: this.environment,
+            config: CONFIG,
+
+            // WebSocket and connection management
+            getWebSocket: () => this.ws,
+            getConnectionState: () => this.isConnected,
+
+            // Editor content and cursor management
+            getEditorContent: () => this.getEditorContent(),
+            getCursorPosition: () => this.getCursorPosition(),
+            setCursorPosition: (position) => this.setCursorPosition(position),
+            getTextEditor: () => this.textEditor,
+
+            // State management callbacks
+            getIsTyping: () => this.isTyping,
+            getSuggestionVisible: () => this.suggestionVisible,
+
+            // FileManager integration
+            fileManager: this.fileManager,
+
+            // Timeout management
+            setTimeoutSafe: (callback, delay) => this.setTimeoutSafe(callback, delay),
+            clearTimeoutSafe: (timeoutId) => this.clearTimeoutSafe(timeoutId),
+
+            // Text change and dictionary management
+            handleTextChange: () => this.handleTextChange(),
+            addWordToDictionary: (word) => this.addWordToDictionary(word),
         });
     }
 
@@ -414,7 +452,9 @@ class TextEditor {
         this.textEditor.focus();
         this.setTimeoutSafe(() => {
             this.requestPrediction();
-            this.requestSpellCheck();
+            if (this.spellChecker) {
+                this.spellChecker.requestSpellCheck();
+            }
         }, 100);
     }
 
@@ -590,7 +630,9 @@ class TextEditor {
                     break;
 
                 case CONFIG.EVENTS.WEBSOCKET.SPELL_CHECK_RESPONSE:
-                    this.handleSpellCheckResponse(message.errors, message.language);
+                    if (this.spellChecker) {
+                        this.spellChecker.handleSpellCheckResponse(message.errors, message.language);
+                    }
                     break;
 
                 case CONFIG.EVENTS.WEBSOCKET.DICTIONARY_UPDATED:
@@ -604,7 +646,9 @@ class TextEditor {
                         }
 
                         // Re-run spell check to update highlights
-                        this.requestSpellCheck();
+                        if (this.spellChecker) {
+                            this.spellChecker.requestSpellCheck();
+                        }
                     }
                     break;
 
@@ -767,7 +811,9 @@ class TextEditor {
             this.hideInlineSuggestion();
 
             // Clear spell check error badges since content has changed
-            this.clearSpellCheckBadges();
+            if (this.spellChecker) {
+                this.spellChecker.clearSpellCheckBadges();
+            }
 
             this.handleTextChange();
 
@@ -877,7 +923,9 @@ class TextEditor {
                 }
 
                 // Clear spell check error badges since content has changed
-                this.clearSpellCheckBadges();
+                if (this.spellChecker) {
+                    this.spellChecker.clearSpellCheckBadges();
+                }
 
                 // CRITICAL FIX: Don't call handleTextChange() to avoid spell check interference
                 // Instead, manually trigger only the necessary save operation
@@ -1606,7 +1654,9 @@ class TextEditor {
             this.requestPrediction();
 
             // Delay spell check until user stops typing to avoid cursor jumping
-            this.requestSpellCheck();
+            if (this.spellChecker) {
+                this.spellChecker.requestSpellCheck();
+            }
 
             // Clear typing flag after a delay
             this.clearTimeoutSafe(this.typingTimeout);
@@ -1724,9 +1774,9 @@ class TextEditor {
                     // Reapply spell checking highlights after normalization
                     // Use a timeout to ensure DOM is stable after restructuring
                     setTimeout(() => {
-                        if (Object.keys(this.spellErrors).length > 0) {
+                        if (this.spellChecker && this.spellChecker.hasSpellErrors()) {
                             console.log('Reapplying spell check highlights after normalization');
-                            this.highlightSpellingErrors();
+                            this.spellChecker.highlightSpellingErrors();
                         }
                     }, 50);
                 }
@@ -2189,7 +2239,9 @@ class TextEditor {
                 }
 
                 // Re-run spell check to update highlights
-                this.requestSpellCheck();
+                if (this.spellChecker) {
+                    this.spellChecker.requestSpellCheck();
+                }
             } else {
                 alert('Failed to remove word from dictionary');
             }
@@ -2295,7 +2347,9 @@ class TextEditor {
                 }, 2000);
 
                 // Re-run spell check to apply new settings
-                this.requestSpellCheck();
+                if (this.spellChecker) {
+                    this.spellChecker.requestSpellCheck();
+                }
             } else {
                 this.errorHandler.showNotification('Failed to save settings', 'error');
             }
@@ -2304,635 +2358,21 @@ class TextEditor {
         }
     }
 
-    // === SPELL CHECKING FUNCTIONALITY ===
-
-    clearSpellCheckBadges() {
-        // Remove all spell check error count badges
-        const badges = this.textEditor.querySelectorAll(`.${CONFIG.CSS_CLASSES.ERROR_COUNT_BADGE}`);
-        badges.forEach(badge => {
-            console.log('Removing spell check badge:', badge.textContent);
-            badge.remove();
-        });
-
-        // Also clear the stored spell errors since they're no longer valid
-        this.spellErrors = {};
-
-        console.log('Cleared all spell check badges and error cache');
-    }
-
-    requestSpellCheck() {
-        try {
-            if (!this.fileManager.hasCurrentFile() || !this.isConnected || !this.spellCheckingEnabled) {
-                return;
-            }
-
-            // CRITICAL: Skip spell check if inline suggestion is active
-            if (
-                this.suggestionVisible &&
-                document.getElementById(CONFIG.SELECTORS.CURRENT_SUGGESTION.slice(1))
-            ) {
-                console.log('Skipping spell check request - inline suggestion is active');
-                return;
-            }
-
-            // Clear existing timeout
-            this.clearTimeoutSafe(this.spellCheckTimeout);
-
-            // Debounce spell check requests
-            this.spellCheckTimeout = this.setTimeoutSafe(() => {
-                try {
-            // Double-check suggestion status before sending request
-                    if (
-                        this.suggestionVisible &&
-                        document.getElementById(CONFIG.SELECTORS.CURRENT_SUGGESTION.slice(1))
-                    ) {
-                        console.log(
-                            'Skipping delayed spell check - inline suggestion is still active'
-                        );
-                        return;
-                    }
-
-                    const content = this.getEditorContent();
-                    const lines = content.split('\n\n').map(p => p.replace(/\n/g, ' ')); // Convert paragraphs to lines
-
-                    console.log('Requesting spell check for', lines.length, 'lines');
-
-                    const message = {
-                        type: 'spell_check_request',
-                        lines: lines,
-                        language: CONFIG.SPELL_CHECK.DEFAULT_LANGUAGE,
-                    };
-
-                    // Validate the message before sending
-                    const validation = this.validator.validateWebSocketMessage(message);
-                    if (!validation.isValid) {
-                        const errorMessage = this.validator.formatErrors(validation);
-                        this.errorHandler.handleError(
-                            new Error(errorMessage),
-                            'validation',
-                            'Invalid spell check request format'
-                        );
-                        return;
-                    }
-
-                    this.ws.send(JSON.stringify(message));
-                } catch (error) {
-                    this.errorHandler.handleError(
-                        error,
-                        'spell-check',
-                        'Failed to send spell check request'
-                    );
-                }
-            }, CONFIG.TIMING.SPELL_CHECK_DEBOUNCE); // Use config value
-        } catch (error) {
-            this.errorHandler.handleError(error, 'spell-check', 'Error in requestSpellCheck');
-        }
-    }
-
-    debugDOMStructure() {
-        console.log('=== DOM STRUCTURE DEBUG ===');
-        const paragraphs = Array.from(this.textEditor.querySelectorAll('p'));
-        console.log(`Total paragraphs: ${paragraphs.length}`);
-
-        paragraphs.forEach((p, idx) => {
-            const wordSpans = Array.from(p.querySelectorAll('.word-token'));
-            const textContent = this.extractTextFromParagraph(p);
-            console.log(`Paragraph ${idx}:`);
-            console.log(`  Text: "${textContent}"`);
-            console.log(
-                `  Word spans (${wordSpans.length}): [${wordSpans.map(s => `"${s.textContent}"`).join(', ')}]`
-            );
-            console.log(
-                `  Raw HTML: ${p.innerHTML.substring(0, 200)}${p.innerHTML.length > 200 ? '...' : ''}`
-            );
-        });
-        console.log('=== END DOM STRUCTURE DEBUG ===');
-    }
-
-    handleSpellCheckResponse(errors, _language) {
-        console.log('=== SPELL CHECK RESPONSE ===');
-        console.log('Raw errors received:', errors);
-        console.log('Number of lines with errors:', Object.keys(errors).length);
-
-        // Log detailed information about each error
-        Object.keys(errors).forEach(lineIndex => {
-            const lineErrors = errors[lineIndex];
-            console.log(`Line ${lineIndex}: ${lineErrors.length} errors`);
-            lineErrors.forEach((error, idx) => {
-                console.log(
-                    `  Error ${idx + 1}: word="${error.word}", suggestions=[${error.suggestions.slice(0, 5).join(', ')}${error.suggestions.length > 5 ? '...' : ''}] (${error.suggestions.length} total)`
-                );
-            });
-        });
-
-        this.spellErrors = errors;
-
-        // CRITICAL: Skip spell error highlighting if inline suggestion is active
-        if (this.suggestionVisible && document.getElementById('current-inline-suggestion')) {
-            console.log('Skipping spell error highlighting - inline suggestion is active');
-            return;
-        }
-
-        // If user is actively typing, delay highlighting to avoid cursor jumping
-        if (this.isTyping) {
-            console.log('User is typing, delaying spell error highlighting for 500ms');
-            setTimeout(() => {
-                if (!this.isTyping && !this.suggestionVisible) {
-                    console.log('Typing stopped and no active suggestion, now highlighting errors');
-                    this.highlightSpellingErrors();
-                } else {
-                    console.log('Still typing or suggestion active, skipping delayed highlighting');
-                }
-            }, 500);
-        } else {
-            console.log('User not typing, highlighting errors immediately');
-            this.debugDOMStructure(); // Debug DOM before highlighting
-            this.highlightSpellingErrors();
-        }
-        console.log('=== END SPELL CHECK RESPONSE ===');
-    }
-
-    highlightSpellingErrors(isRetry = false) {
-        console.log(
-            'Starting highlightSpellingErrors with errors:',
-            this.spellErrors,
-            'isRetry:',
-            isRetry
-        );
-
-        // CRITICAL: Skip highlighting if inline suggestion is active
-        if (this.suggestionVisible && document.getElementById('current-inline-suggestion')) {
-            console.log('Skipping spell error highlighting - inline suggestion is active');
-            return;
-        }
-
-        // Save current cursor position before DOM manipulation
-        const savedCursorPosition = this.getCursorPosition();
-
-        // Remove existing spell error highlights and restore original word token content
-        this.textEditor.querySelectorAll(`.${CONFIG.CSS_CLASSES.WORD_TOKEN}`).forEach(wordToken => {
-            // Skip word tokens that contain inline suggestions
-            if (
-                wordToken.querySelector(`.${CONFIG.CSS_CLASSES.INLINE_SUGGESTION}`) ||
-                wordToken.querySelector(CONFIG.SELECTORS.CURRENT_SUGGESTION)
-            ) {
-                console.log(
-                    'Skipping spell error highlighting for word token with inline suggestion'
-                );
-                return;
-            }
-
-            // Check if this word token has spell error highlights
-            const errorHighlights = wordToken.querySelectorAll(
-                `.${CONFIG.CSS_CLASSES.SPELL_ERROR_HIGHLIGHT}`
-            );
-            if (errorHighlights.length > 0) {
-                // Extract all text content and restore as plain text
-                const fullText = wordToken.textContent;
-                wordToken.innerHTML = '';
-                wordToken.appendChild(document.createTextNode(fullText));
-            }
-
-            // Remove any remaining spell error classes and attributes
-            wordToken.classList.remove(CONFIG.CSS_CLASSES.SPELL_ERROR);
-            wordToken.removeAttribute('data-suggestions');
-            wordToken.removeAttribute('title');
-            wordToken.removeAttribute('data-word');
-            wordToken.removeAttribute('data-all-suggestions');
-        });
-
-        // Remove any standalone spell error elements (fallback)
-        this.textEditor
-            .querySelectorAll(
-                `.${CONFIG.CSS_CLASSES.SPELL_ERROR}, .${CONFIG.CSS_CLASSES.SPELL_ERROR_HIGHLIGHT}`
-            )
-            .forEach(element => {
-                element.classList.remove(
-                    CONFIG.CSS_CLASSES.SPELL_ERROR,
-                    CONFIG.CSS_CLASSES.SPELL_ERROR_HIGHLIGHT
-                );
-                element.removeAttribute('data-suggestions');
-                element.removeAttribute('title');
-                element.removeAttribute('data-word');
-                element.removeAttribute('data-all-suggestions');
-            });
-
-        // Remove existing error count badges
-        this.textEditor
-            .querySelectorAll(`.${CONFIG.CSS_CLASSES.ERROR_COUNT_BADGE}`)
-            .forEach(badge => badge.remove());
-
-        if (Object.keys(this.spellErrors).length === 0) {
-            console.log('No spell errors to highlight');
-            // Restore cursor position and return early if no errors
-            setTimeout(() => this.setCursorPosition(savedCursorPosition), 0);
-            return;
-        }
-
-        // Get all paragraphs
-        const paragraphs = Array.from(this.textEditor.querySelectorAll('p'));
-        console.log('Found paragraphs:', paragraphs.length);
-
-        let totalErrorsProcessed = 0;
-        let totalErrorsHighlighted = 0;
-
-        Object.keys(this.spellErrors).forEach(lineIndex => {
-            const paragraphIndex = parseInt(lineIndex);
-            const paragraph = paragraphs[paragraphIndex];
-
-            console.log(
-                `Processing line ${lineIndex}, paragraph index ${paragraphIndex}, paragraph exists:`,
-                !!paragraph
-            );
-
-            if (!paragraph) {
-                console.warn(`No paragraph found for line index ${lineIndex}`);
-                return;
-            }
-
-            const errors = this.spellErrors[lineIndex];
-            console.log(
-                `Line ${lineIndex} has ${errors.length} errors:`,
-                errors.map(e => e.word)
-            );
-
-            // Get the full text content of this paragraph to search within
-            const paragraphText = this.extractTextFromParagraph(paragraph);
-            console.log(`Paragraph ${paragraphIndex} text: "${paragraphText}"`);
-
-            let paragraphErrorsHighlighted = 0;
-
-            // For each error, find it in the word tokens and create precise highlighting
-            errors.forEach(error => {
-                totalErrorsProcessed++;
-                const errorWord = error.word;
-                console.log(`Looking for error word: "${errorWord}" in word tokens`);
-
-                // Find word tokens that contain this error word
-                const wordSpans = Array.from(paragraph.querySelectorAll('.word-token'));
-                let found = false;
-
-                for (const span of wordSpans) {
-                    const spanText = span.textContent;
-
-                    // Check if this span contains the error word (case insensitive)
-                    const lowerSpanText = spanText.toLowerCase();
-                    const lowerErrorWord = errorWord.toLowerCase();
-                    const errorIndex = lowerSpanText.indexOf(lowerErrorWord);
-
-                    if (errorIndex !== -1) {
-                        // Create precise highlighting within the word token
-                        const beforeText = spanText.substring(0, errorIndex);
-                        const errorText = spanText.substring(
-                            errorIndex,
-                            errorIndex + errorWord.length
-                        );
-                        const afterText = spanText.substring(errorIndex + errorWord.length);
-
-                        // Clear the span and rebuild with highlighted error
-                        span.innerHTML = '';
-
-                        // Add text before error (if any)
-                        if (beforeText) {
-                            span.appendChild(document.createTextNode(beforeText));
-                        }
-
-                        // Add highlighted error text
-                        const errorSpan = document.createElement('span');
-                        errorSpan.className = CONFIG.CSS_CLASSES.SPELL_ERROR_HIGHLIGHT;
-                        errorSpan.textContent = errorText;
-                        errorSpan.style.backgroundColor = CONFIG.SPELL_CHECK.ERROR_HIGHLIGHT_COLOR;
-                        errorSpan.style.borderBottom = CONFIG.SPELL_CHECK.ERROR_BORDER_STYLE;
-                        errorSpan.style.cursor = 'pointer';
-
-                        // Store spell error data on the highlighted span
-                        const suggestions = error.suggestions.slice(0, 3).join(', ');
-                        errorSpan.setAttribute('data-word', error.word);
-                        errorSpan.setAttribute('data-suggestions', suggestions);
-                        errorSpan.setAttribute('title', `Suggestions: ${suggestions}`);
-                        errorSpan.setAttribute(
-                            'data-all-suggestions',
-                            JSON.stringify(error.suggestions)
-                        );
-
-                        // Add click handlers to the error span
-                        errorSpan.addEventListener('click', e => this.handleSpellErrorClick(e));
-                        errorSpan.addEventListener('contextmenu', e =>
-                            this.handleSpellErrorRightClick(e)
-                        );
-
-                        span.appendChild(errorSpan);
-
-                        // Add text after error (if any)
-                        if (afterText) {
-                            span.appendChild(document.createTextNode(afterText));
-                        }
-
-                        totalErrorsHighlighted++;
-                        paragraphErrorsHighlighted++;
-                        found = true;
-                        console.log(
-                            `Successfully highlighted error "${errorWord}" within span "${spanText}"`
-                        );
-                        break; // Only highlight first occurrence to avoid duplicates
-                    }
-                }
-
-                if (!found) {
-                    console.warn(
-                        `Could not find word token containing "${errorWord}" in paragraph ${paragraphIndex}`
-                    );
-                    console.warn(
-                        'Available word tokens:',
-                        wordSpans.map(s => `"${s.textContent}"`)
-                    );
-                }
-            });
-
-            // Add error count badge to paragraph if there are errors
-            if (paragraphErrorsHighlighted > 0) {
-                this.addErrorCountBadge(paragraph, paragraphErrorsHighlighted, errors.length);
-            }
-        });
-
-        console.log(
-            `Spell error highlighting complete: ${totalErrorsHighlighted}/${totalErrorsProcessed} errors highlighted`
-        );
-
-        // Restore cursor position after DOM manipulation
-        setTimeout(() => {
-            this.setCursorPosition(savedCursorPosition);
-        }, 0);
-    }
-
-    addErrorCountBadge(paragraph, highlightedCount, totalCount) {
-        // Create error count badge
-        const badge = document.createElement('span');
-        badge.className = CONFIG.CSS_CLASSES.ERROR_COUNT_BADGE;
-        badge.textContent = `${highlightedCount}/${totalCount} errors`;
-        badge.style.position = 'absolute';
-        badge.style.right = '10px';
-        badge.style.top = '5px';
-        badge.style.background = '#dc3545';
-        badge.style.color = 'white';
-        badge.style.fontSize = '11px';
-        badge.style.padding = '2px 6px';
-        badge.style.borderRadius = '10px';
-        badge.style.fontWeight = '500';
-        badge.style.zIndex = '10';
-        badge.style.userSelect = 'none';
-        badge.style.pointerEvents = 'none';
-
-        // Make paragraph position relative so badge positions correctly
-        if (getComputedStyle(paragraph).position === 'static') {
-            paragraph.style.position = 'relative';
-        }
-
-        // Add badge to paragraph
-        paragraph.appendChild(badge);
-
-        console.log(
-            `Added error count badge to paragraph: ${highlightedCount}/${totalCount} errors`
-        );
-    }
-
-    handleSpellErrorClick(e) {
-        e.preventDefault();
-        e.stopPropagation();
-
-        const span = e.target;
-        const word = span.dataset.word;
-        const suggestions = span.dataset.suggestions.split(', ').filter(s => s.trim());
-
-        this.showSpellingSuggestions(span, word, suggestions);
-    }
-
-    handleSpellErrorRightClick(e) {
-        e.preventDefault();
-        e.stopPropagation();
-
-        const span = e.target;
-        const word = span.dataset.word;
-        const suggestions = span.dataset.suggestions.split(', ').filter(s => s.trim());
-
-        this.showSpellingSuggestions(span, word, suggestions);
-    }
-
-    showSpellingSuggestions(span, word, suggestions) {
-        // Remove any existing suggestion menu
-        document.querySelectorAll('.spell-suggestions').forEach(menu => menu.remove());
-
-        const menu = document.createElement('div');
-        menu.className = 'spell-suggestions';
-        menu.style.position = 'absolute';
-        menu.style.background = 'white';
-        menu.style.border = '1px solid #ccc';
-        menu.style.borderRadius = '4px';
-        menu.style.padding = '0';
-        menu.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
-        menu.style.zIndex = '1000';
-        menu.style.minWidth = '200px';
-        menu.style.maxWidth = '300px';
-        menu.style.maxHeight = '400px';
-        menu.style.overflow = 'hidden';
-        menu.style.display = 'flex';
-        menu.style.flexDirection = 'column';
-
-        // Position menu near the error
-        const rect = span.getBoundingClientRect();
-        const menuLeft = Math.min(rect.left, window.innerWidth - 320); // Ensure menu doesn't go off screen
-        const menuTop = rect.bottom + 5;
-
-        menu.style.left = `${menuLeft}px`;
-        menu.style.top = `${menuTop}px`;
-
-        // Add header
-        if (suggestions.length > 0) {
-            const header = document.createElement('div');
-            header.style.padding = '8px 12px';
-            header.style.backgroundColor = '#f8f9fa';
-            header.style.borderBottom = '1px solid #dee2e6';
-            header.style.fontWeight = '600';
-            header.style.fontSize = '0.9rem';
-            header.style.color = '#495057';
-            header.textContent = `Suggestions for "${word}" (${suggestions.length})`;
-            menu.appendChild(header);
-
-            // Create scrollable suggestions container
-            const suggestionsContainer = document.createElement('div');
-            suggestionsContainer.style.maxHeight = '300px';
-            suggestionsContainer.style.overflowY = 'auto';
-            suggestionsContainer.style.padding = '4px 0';
-
-            suggestions.forEach((suggestion, index) => {
-                const option = document.createElement('div');
-                option.className = 'spell-suggestion-option';
-                option.style.padding = '6px 12px';
-                option.style.cursor = 'pointer';
-                option.style.borderBottom =
-                    index < suggestions.length - 1 ? '1px solid #f0f0f0' : 'none';
-                option.style.fontSize = '0.9rem';
-                option.style.transition = 'background-color 0.15s ease';
-
-                // Highlight the suggestion text
-                const suggestionText = document.createElement('span');
-                suggestionText.textContent = suggestion;
-                suggestionText.style.fontWeight = '500';
-                option.appendChild(suggestionText);
-
-                option.addEventListener('mouseenter', () => {
-                    option.style.backgroundColor = '#e3f2fd';
-                });
-                option.addEventListener('mouseleave', () => {
-                    option.style.backgroundColor = 'transparent';
-                });
-
-                option.addEventListener('click', () => {
-                    this.replaceSpellError(span, suggestion);
-                    menu.remove();
-                });
-
-                suggestionsContainer.appendChild(option);
-            });
-
-            menu.appendChild(suggestionsContainer);
-
-            // Add separator
-            const separator = document.createElement('div');
-            separator.style.height = '1px';
-            separator.style.backgroundColor = '#dee2e6';
-            separator.style.margin = '4px 0';
-            menu.appendChild(separator);
-        } else {
-            // No suggestions available
-            const noSuggestions = document.createElement('div');
-            noSuggestions.style.padding = '12px';
-            noSuggestions.style.textAlign = 'center';
-            noSuggestions.style.color = '#6c757d';
-            noSuggestions.style.fontStyle = 'italic';
-            noSuggestions.textContent = 'No suggestions available';
-            menu.appendChild(noSuggestions);
-
-            // Add separator
-            const separator = document.createElement('div');
-            separator.style.height = '1px';
-            separator.style.backgroundColor = '#dee2e6';
-            separator.style.margin = '4px 0';
-            menu.appendChild(separator);
-        }
-
-        // Add "Add to dictionary" option
-        const addToDictionary = document.createElement('div');
-        addToDictionary.className = 'spell-suggestion-option';
-        addToDictionary.style.padding = '8px 12px';
-        addToDictionary.style.cursor = 'pointer';
-        addToDictionary.style.fontStyle = 'italic';
-        addToDictionary.style.backgroundColor = '#f8f9fa';
-        addToDictionary.style.borderTop = '1px solid #dee2e6';
-        addToDictionary.style.fontSize = '0.85rem';
-        addToDictionary.style.color = '#28a745';
-        addToDictionary.style.fontWeight = '500';
-        addToDictionary.style.transition = 'background-color 0.15s ease';
-        addToDictionary.innerHTML = `<span style="margin-right: 6px;">+</span>Add "${word}" to dictionary`;
-
-        addToDictionary.addEventListener('mouseenter', () => {
-            addToDictionary.style.backgroundColor = '#e8f5e8';
-        });
-        addToDictionary.addEventListener('mouseleave', () => {
-            addToDictionary.style.backgroundColor = '#f8f9fa';
-        });
-
-        addToDictionary.addEventListener('click', () => {
-            this.addWordToDictionary(word);
-            menu.remove();
-        });
-
-        menu.appendChild(addToDictionary);
-
-        document.body.appendChild(menu);
-
-        // Close menu when clicking outside
-        const closeMenu = e => {
-            if (!menu.contains(e.target)) {
-                menu.remove();
-                document.removeEventListener('click', closeMenu);
-            }
-        };
-        setTimeout(() => document.addEventListener('click', closeMenu), 10);
-    }
-
-    replaceSpellError(span, replacement) {
-        // Store cursor position
-        const savedPosition = this.getCursorPosition();
-
-        // Check if this is a spell-error-highlight span (precise highlighting) or a word-token span (legacy)
-        if (span.classList.contains('spell-error-highlight')) {
-            // This is a precise highlight within a word token
-            const wordToken = span.parentNode;
-            const originalWord = span.getAttribute('data-word');
-
-            // Get the current content of the word token
-            const currentText = wordToken.textContent;
-
-            // Replace the error word with the replacement in the text
-            const newText = currentText.replace(originalWord, replacement);
-
-            // Replace the entire word token content with the corrected text
-            wordToken.innerHTML = '';
-            wordToken.appendChild(document.createTextNode(newText));
-            wordToken.setAttribute('data-word', newText.toLowerCase());
-        } else {
-            // Legacy handling: this is a word-token span with spell-error class
-            span.textContent = replacement;
-            span.classList.remove('spell-error');
-            span.removeAttribute('data-suggestions');
-            span.removeAttribute('title');
-            span.setAttribute('data-word', replacement.toLowerCase());
-
-            // Ensure no residual styling
-            span.style.removeProperty('background-color');
-            span.style.removeProperty('border-bottom');
-            span.style.removeProperty('border');
-            span.style.removeProperty('text-decoration');
-            span.style.removeProperty('cursor');
-
-            // Remove event listeners by cloning the node
-            const newSpan = span.cloneNode(true);
-            newSpan.className = 'word-token'; // Ensure clean class
-            span.parentNode.replaceChild(newSpan, span);
-        }
-
-        // Position cursor right after the corrected word
-        setTimeout(() => {
-            try {
-                const selection = window.getSelection();
-                const range = document.createRange();
-                range.setStartAfter(newSpan);
-                range.collapse(true);
-                selection.removeAllRanges();
-                selection.addRange(range);
-            } catch (error) {
-                console.error('Error positioning cursor after spell correction:', error);
-                this.setCursorPosition(savedPosition);
-            }
-        }, 0);
-
-        // Trigger save and re-run spell check to update error counts
-        this.handleTextChange();
-
-        // Re-run spell check after a short delay to update error badges
-        setTimeout(() => {
-            this.requestSpellCheck();
-        }, 200);
-    }
-
     addWordToDictionary(word) {
-        if (!this.isConnected) return;
+        console.log('TextEditor.addWordToDictionary called with word:', word);
+        console.log('WebSocket connected:', this.isConnected);
+
+        if (!this.isConnected) {
+            console.error('Cannot add word to dictionary - WebSocket not connected');
+            return;
+        }
 
         const message = {
             type: 'add_word',
             word: word,
         };
+
+        console.log('Sending add_word message:', message);
 
         // Validate the message before sending
         const validation = this.validator.validateWebSocketMessage(message);
@@ -2947,6 +2387,7 @@ class TextEditor {
         }
 
         this.ws.send(JSON.stringify(message));
+        console.log('Add word message sent successfully');
     }
 }
 

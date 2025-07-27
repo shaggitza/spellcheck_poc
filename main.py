@@ -568,8 +568,8 @@ async def websocket_endpoint(websocket: WebSocket):
                     "language": language
                 }
                 await manager.send_personal_message(response, websocket)
-            
-            elif message["type"] == "add_to_dictionary":
+
+            elif message["type"] == "add_word":
                 # Add word to user's custom dictionary
                 word = message.get("word", "")
                 if word:
