@@ -1,5 +1,8 @@
 # Text Editor with Intelligent Writing Assistance
 
+[![CI](https://github.com/shaggitza/spellcheck_poc/actions/workflows/ci.yml/badge.svg)](https://github.com/shaggitza/spellcheck_poc/actions/workflows/ci.yml)
+[![Code Quality](https://github.com/shaggitza/spellcheck_poc/actions/workflows/code-quality.yml/badge.svg)](https://github.com/shaggitza/spellcheck_poc/actions/workflows/code-quality.yml)
+
 A modern web-based text editor with real-time writing assistance, featuring next-token prediction, spell checking, and intelligent suggestions to enhance your writing experience.
 
 ## ✨ Key Features
@@ -154,6 +157,93 @@ The system includes intelligent responses for common writing patterns:
 - **Security scanning** - Dependency vulnerability checks and code analysis
 
 ## 🛠 For Developers
+
+### Development Setup
+
+**Prerequisites:**
+- Python 3.9+ 
+- Node.js 18+
+- Git
+
+**Quick Setup:**
+```bash
+# Clone the repository
+git clone https://github.com/shaggitza/spellcheck_poc.git
+cd spellcheck_poc
+
+# Install Python dependencies
+pip install -r requirements.txt
+pip install -r requirements-dev.txt  # For development tools
+
+# Install Node.js dependencies
+npm install
+
+# Run linting and tests
+npm run lint && npm test
+python -m pytest
+
+# Start the application
+python main.py
+```
+
+### Code Quality Tools
+
+The project uses several tools to maintain code quality:
+
+**Python:**
+- `flake8` - Linting and style checking
+- `black` - Code formatting
+- `isort` - Import sorting
+- `pytest` - Testing framework
+- `safety` - Security vulnerability scanning
+- `bandit` - Security linting
+
+**JavaScript:**
+- `eslint` - Linting and style checking  
+- `prettier` - Code formatting
+- `jest` - Testing framework
+
+**Run all quality checks:**
+```bash
+# Python
+flake8 .
+black --check .
+isort --check-only .
+pytest
+
+# JavaScript
+npm run lint
+npm run format:check  
+npm test
+```
+
+### Continuous Integration
+
+The project uses GitHub Actions for CI/CD with the following workflows:
+
+**Main CI Pipeline (`.github/workflows/ci.yml`):**
+- ✅ **Frontend Testing**: Node.js 18, ESLint, Prettier, Jest
+- ✅ **Backend Testing**: Python 3.9-3.12 matrix testing
+- ✅ **Code Quality**: Linting, formatting checks
+- ✅ **Security Scanning**: Dependency and code security checks
+- ✅ **Build Verification**: Application startup smoke tests
+- ✅ **Coverage Reporting**: Code coverage with Codecov
+
+**Code Quality Pipeline (`.github/workflows/code-quality.yml`):**
+- ✅ **CodeQL Analysis**: Security and quality analysis
+- ✅ **Dependency Review**: Automated dependency vulnerability checks
+- ✅ **Outdated Dependencies**: Weekly checks for package updates
+
+All pull requests must pass CI checks before merging.
+
+### Contributing
+
+1. **Fork the repository** and create a feature branch
+2. **Install development dependencies**: `pip install -r requirements-dev.txt && npm install`
+3. **Make your changes** following the existing code style
+4. **Run quality checks**: `npm run lint && python -m pytest`
+5. **Write tests** for new functionality
+6. **Submit a pull request** with a clear description of changes
 
 ### Extending the Application
 
