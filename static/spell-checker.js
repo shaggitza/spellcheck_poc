@@ -364,7 +364,7 @@ class SpellChecker {
         });
 
         // Remove all error count badges
-        const errorBadges = textEditor.querySelectorAll('.spell-error-badge');
+        const errorBadges = textEditor.querySelectorAll('.error-count-badge');
         errorBadges.forEach(badge => badge.remove());
 
         console.log('Cleared all spell check badges and error cache');
@@ -374,37 +374,55 @@ class SpellChecker {
      * Add error count badge to a paragraph
      */
     addErrorCountBadge(paragraph, highlightedCount, totalCount) {
+        // Don't add badges if user is actively typing to avoid interference
+        if (this.getIsTyping && this.getIsTyping()) {
+            console.log('Skipping error badge - user is typing');
+            return;
+        }
+
         // Remove existing badge if present
-        const existingBadge = paragraph.querySelector('.spell-error-badge');
+        const existingBadge = paragraph.querySelector('.error-count-badge');
         if (existingBadge) {
             existingBadge.remove();
         }
 
-        // Create new badge
+        // Create new badge - positioned outside the editor area and hidden by default
         const badge = this.utils.createElement(
             'span',
             {
-                className: 'spell-error-badge',
+                className: 'error-count-badge',
                 style: {
                     position: 'absolute',
-                    right: '-30px',
-                    top: '0',
+                    right: '-35px',
+                    top: '2px',
                     backgroundColor: highlightedCount === totalCount ? '#dc3545' : '#ffc107',
                     color: 'white',
                     borderRadius: '50%',
-                    width: '20px',
-                    height: '20px',
+                    width: '16px',
+                    height: '16px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: '10px',
+                    fontSize: '9px',
                     fontWeight: 'bold',
-                    zIndex: '10'
+                    zIndex: '10',
+                    opacity: '0.7',
+                    pointerEvents: 'none', // Don't interfere with text selection
+                    visibility: 'hidden' // Hidden by default, only show on hover
                 },
                 title: `${highlightedCount}/${totalCount} errors highlighted`
             },
             totalCount.toString()
         );
+
+        // Show badge only on paragraph hover
+        paragraph.addEventListener('mouseenter', () => {
+            badge.style.visibility = 'visible';
+        });
+
+        paragraph.addEventListener('mouseleave', () => {
+            badge.style.visibility = 'hidden';
+        });
 
         // Make paragraph relatively positioned to contain the badge
         if (paragraph.style.position !== 'relative') {

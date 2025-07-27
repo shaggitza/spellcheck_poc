@@ -42,6 +42,11 @@ const createMockUtils = () => ({
         Object.entries(attrs).forEach(([key, value]) => {
             if (key === 'className') {
                 element.className = value;
+            } else if (key === 'style' && typeof value === 'object') {
+                // Apply style object to element.style
+                Object.entries(value).forEach(([styleKey, styleValue]) => {
+                    element.style[styleKey] = styleValue;
+                });
             } else {
                 element.setAttribute(key, value);
             }

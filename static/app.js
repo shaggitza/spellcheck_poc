@@ -1059,20 +1059,31 @@ class TextEditor {
                 if (currentP) {
                     // Create new paragraph
                     const newP = document.createElement('p');
-                    newP.innerHTML = '<br>';
 
                     // Insert after current paragraph
                     currentP.parentNode.insertBefore(newP, currentP.nextSibling);
 
-                    // Move cursor to new paragraph
+                    // Move cursor to new paragraph - ensure proper cursor positioning
+                    // We need to set this up so the user can immediately start typing
                     const newRange = document.createRange();
-                    newRange.setStart(newP, 0);
+
+                    // Add an empty text node to ensure proper cursor positioning
+                    const textNode = document.createTextNode('');
+                    newP.appendChild(textNode);
+
+                    // Position cursor at the start of the text node
+                    newRange.setStart(textNode, 0);
                     newRange.collapse(true);
+
                     selection.removeAllRanges();
                     selection.addRange(newRange);
 
-                    // Trigger text change
-                    this.handleTextChange();
+                    // Focus the editor to ensure proper cursor visibility
+                    this.textEditor.focus();
+
+                    // Don't trigger text change immediately - let the user start typing first
+                    // This prevents interference with the first keystroke
+                    console.log('New paragraph created, ready for user input');
                 }
             }
             return;
@@ -1369,7 +1380,15 @@ class TextEditor {
                 // Check if this paragraph needs restructuring - be more conservative
                 let needsRestructure = false;
 
-                // Look for text nodes that aren't just whitespace AND are not inside word-token spans
+                // Skip normalization for very new/empty paragraphs that might just have been created
+                const hasOnlyBrOrEmpty = paragraph.childNodes.length === 0 ||
+                    (paragraph.childNodes.length === 1 && paragraph.firstChild.nodeName === 'BR') ||
+                    (paragraph.childNodes.length === 1 && paragraph.firstChild.nodeType === Node.TEXT_NODE && paragraph.firstChild.textContent === '');
+
+                if (hasOnlyBrOrEmpty) {
+                    console.log('Skipping normalization for empty/new paragraph');
+                    return;
+                }                // Look for text nodes that aren't just whitespace AND are not inside word-token spans
                 const walker = document.createTreeWalker(
                     paragraph,
                     NodeFilter.SHOW_TEXT,
