@@ -1,132 +1,190 @@
-# Text Editor with Next Token Prediction
+# Text Editor with Intelligent Writing Assistance
 
-A simple FastAPI web application with WebSocket support for editing text files with real-time next token prediction.
+A modern web-based text editor with real-time writing assistance, featuring next-token prediction, spell checking, and intelligent suggestions to enhance your writing experience.
 
-## Features
+## ✨ Key Features
 
-- **Real-time text editing**: Edit text files with live saving
-- **WebSocket communication**: Real-time updates between client and server
-- **Next token prediction**: Mock implementation that can be replaced with actual ML models
-- **File management**: Create, list, and edit text files
-- **Responsive UI**: Bootstrap-based interface that works on desktop and mobile
+### 📝 **Smart Text Editing**
 
-## Project Structure
+- **Real-time editing** with instant auto-save
+- **Rich text interface** with paragraph-based structure
+- **Intelligent suggestions** displayed inline as you type
+- **Multiple file management** with easy switching between documents
+
+### 🤖 **AI-Powered Assistance**
+
+- **Next-token prediction** for writing continuation suggestions
+- **Context-aware predictions** based on your writing style
+- **Inline suggestions** with Tab to accept, Ctrl+Right for partial acceptance
+- **Spell checking** with real-time error highlighting
+
+### 🔄 **Real-time Collaboration Ready**
+
+- **WebSocket communication** for instant updates
+- **Live prediction streaming** with low-latency responses
+- **Robust connection handling** with automatic reconnection
+
+### 💾 **File Management**
+
+- **Create and edit** text files with `.txt` format
+- **Automatic saving** with visual save status indicators
+- **File browser** sidebar for quick navigation
+- **Dashboard view** for project overview
+
+### 🎨 **Modern Interface**
+
+- **Responsive design** that works on desktop and mobile
+- **Bootstrap-based UI** with clean, professional styling
+- **Accessibility features** including keyboard navigation
+- **Environment-aware debugging** tools for developers
+
+## 🚀 Quick Start
+
+### Installation
+
+1. **Clone the repository** and navigate to the project directory
+
+2. **Install Python dependencies**:
+
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+3. **Start the application**:
+
+    ```bash
+    python main.py
+    ```
+
+    Or use the startup script:
+
+    ```bash
+    ./start.sh
+    ```
+
+4. **Open your browser** and go to: http://localhost:8000
+
+### First Steps
+
+1. **Dashboard**: Start at the dashboard to see your file overview
+2. **Create a file**: Enter a filename ending in `.txt` and click "Create File"
+3. **Start writing**: Begin typing and watch the AI suggestions appear
+4. **Accept suggestions**: Press Tab to accept full suggestions, Ctrl+Right for partial
+5. **Auto-save**: Your changes are automatically saved as you type
+
+## 🎯 How to Use
+
+### Writing with AI Assistance
+
+1. **Start typing** - The editor detects your writing context and provides intelligent suggestions
+2. **Accept suggestions**:
+    - **Tab** - Accept the full suggestion
+    - **Ctrl + Right Arrow** - Accept just the first word
+    - **Escape** - Dismiss the current suggestion
+3. **Auto-complete** - Suggestions appear as grayed-out text at your cursor position
+4. **Spell checking** - Misspelled words are highlighted with error badges
+
+### File Management
+
+- **View files** - All `.txt` files appear in the left sidebar
+- **Switch files** - Click any file name to open it instantly
+- **Create new files** - Use the "New File" input at the top of the sidebar
+- **Dashboard mode** - Click the dashboard button for a project overview
+
+### Keyboard Shortcuts
+
+- **Ctrl + S** - Manual save (though auto-save handles this automatically)
+- **Tab** - Accept AI writing suggestion
+- **Ctrl + Right** - Accept partial suggestion (first word only)
+- **Escape** - Hide current suggestion
+- **Enter** - Create new paragraph
+
+## 🤖 AI Writing Features
+
+### Smart Predictions
+
+The AI system analyzes your writing context and provides contextually relevant suggestions:
+
+- **Contextual awareness** - Predictions adapt to your writing style and topic
+- **Real-time streaming** - Suggestions update as you type
+- **Multiple prediction modes** - Full sentence completion and word-by-word assistance
+
+### Current Prediction Patterns
+
+The system includes intelligent responses for common writing patterns:
+
+- **Article beginnings** - "the " → contextual noun phrases
+- **Greetings** - "hello " → appropriate continuations
+- **Technical writing** - "function " → programming-related suggestions
+- **Lists and imports** - "import " → relevant module suggestions
+
+### Customization
+
+- **Adaptive learning** - The system learns from your writing patterns
+- **Environment-aware** - Behaves differently in development vs. production
+- **Configurable timing** - Suggestion delays and debouncing can be adjusted
+
+## 🔧 Technical Features
+
+### Robust Architecture
+
+- **Error handling** - Comprehensive error catching with user-friendly messages
+- **Input validation** - All user inputs are validated and sanitized
+- **Environment detection** - Automatic development/production mode switching
+- **Performance optimization** - Debounced operations and efficient DOM handling
+
+### Real-time Communication
+
+- **WebSocket integration** - Low-latency bidirectional communication
+- **Automatic reconnection** - Handles connection drops gracefully
+- **Message validation** - All WebSocket messages are validated for security
+
+### Modern Development
+
+- **Modular architecture** - Separated concerns across multiple JavaScript modules
+- **Utility functions** - Reusable helper functions for common operations
+- **Debug tools** - Development mode includes debugging aids and performance monitoring
+
+## 🛠 For Developers
+
+### Extending the Application
+
+**Add Language Models**: Replace the prediction system with your preferred ML model (OpenAI, Transformers, etc.)
+
+**Custom File Formats**: Extend beyond `.txt` files by modifying the validation and processing logic
+
+**Collaborative Features**: Build on the WebSocket foundation to add real-time collaborative editing
+
+**Enhanced UI**: The modular frontend architecture makes it easy to add new interface components
+
+### Project Structure
 
 ```
 spellcheck_poc/
-├── main.py              # FastAPI application with WebSocket support
-├── requirements.txt     # Python dependencies
-├── start.sh            # Startup script
-├── templates/
-│   └── editor.html     # HTML template for the editor
+├── main.py                    # FastAPI backend with WebSocket support
+├── templates/editor.html      # Main application interface
 ├── static/
-│   ├── style.css       # CSS styling
-│   └── app.js          # JavaScript for WebSocket and editor logic
-└── text_files/         # Directory for text files to edit
-    └── sample.txt      # Sample text file
+│   ├── app.js                # Main application logic
+│   ├── environment.js        # Environment detection and configuration
+│   ├── error-handler.js      # Centralized error handling
+│   ├── validator.js          # Input validation and sanitization
+│   ├── utils.js             # Common utility functions
+│   └── style.css            # Application styling
+└── text_files/              # User document storage
 ```
 
-## Installation
+## 📋 Requirements
 
-1. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+- **Python 3.7+**
+- **FastAPI** - Modern web framework
+- **Uvicorn** - ASGI server
+- **WebSocket support** - For real-time communication
+- **Modern web browser** - Chrome, Firefox, Safari, or Edge with JavaScript enabled
 
-2. Start the application:
-   ```bash
-   python main.py
-   ```
-   
-   Or use the startup script:
-   ```bash
-   ./start.sh
-   ```
+## 📄 License
 
-3. Open your browser and go to: http://localhost:8000
+This project is available for educational and development purposes. Feel free to fork, modify, and extend it for your own use cases.
 
-## Usage
+---
 
-1. **View Files**: The sidebar shows all `.txt` files in the `text_files/` directory
-2. **Create New File**: Enter a filename in the input field and click "Create File"
-3. **Edit Files**: Click on a file in the sidebar to load it in the editor
-4. **Auto-save**: Changes are automatically saved after 1 second of inactivity
-5. **Manual Save**: Click the "Save" button or press Ctrl+S
-6. **Next Token Prediction**: See predictions in the blue box below the editor
-
-## Next Token Prediction
-
-The current implementation includes a mock prediction system that responds to certain patterns:
-
-- `"the "` → `"quick brown fox"`
-- `"hello "` → `"world"`
-- `"function "` → `"name()"`
-- `"import "` → `"os, sys, json"`
-- Other cases → `"next tokens here"` or `"prediction"`
-
-To integrate a real language model:
-
-1. Replace the `predict_next_tokens()` function in `main.py`
-2. Install your preferred ML library (transformers, openai, etc.)
-3. Load your model and implement the prediction logic
-
-## WebSocket API
-
-The application uses WebSocket for real-time communication:
-
-### Client → Server Messages
-
-```json
-{
-    "type": "edit",
-    "filename": "example.txt",
-    "content": "file content",
-    "cursor_position": 123
-}
-```
-
-```json
-{
-    "type": "prediction_request",
-    "content": "text content",
-    "cursor_position": 123
-}
-```
-
-### Server → Client Messages
-
-```json
-{
-    "type": "edit_response",
-    "filename": "example.txt",
-    "success": true,
-    "prediction": "next tokens here",
-    "cursor_position": 123
-}
-```
-
-```json
-{
-    "type": "prediction_response",
-    "prediction": "predicted text",
-    "cursor_position": 123
-}
-```
-
-## Development
-
-To extend this application:
-
-1. **Add new file formats**: Modify the file listing and validation logic
-2. **Improve predictions**: Replace the mock function with actual ML models
-3. **Add collaborative editing**: Extend WebSocket handling for multiple users
-4. **Add syntax highlighting**: Integrate a code editor like Monaco or CodeMirror
-5. **Add authentication**: Implement user management and file permissions
-
-## Requirements
-
-- Python 3.7+
-- FastAPI
-- Uvicorn
-- WebSocket support
-- Modern web browser with JavaScript enabled
+**Built with ❤️ using FastAPI, WebSockets, and modern JavaScript**

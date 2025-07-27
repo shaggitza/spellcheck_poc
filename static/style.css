@@ -131,7 +131,9 @@ body {
 /* Rich text editor styles */
 .editor-rich-text {
     flex: 1;
-    font-family: 'JetBrains Mono', 'Fira Code', 'Source Code Pro', 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-family:
+        'JetBrains Mono', 'Fira Code', 'Source Code Pro', 'Consolas', 'Monaco', 'Courier New',
+        monospace;
     font-size: 16px;
     line-height: 1.5;
     font-weight: 400;
@@ -151,20 +153,20 @@ body {
     box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
 }
 
-.editor-rich-text[contenteditable="false"] {
+.editor-rich-text[contenteditable='false'] {
     background-color: #f8f9fa;
     color: #6c757d;
     cursor: not-allowed;
 }
 
-.editor-rich-text[contenteditable="false"]:before {
+.editor-rich-text[contenteditable='false']:before {
     content: attr(data-placeholder);
     color: #6c757d;
     font-style: italic;
 }
 
-.editor-rich-text[contenteditable="true"]:empty:before {
-    content: "Start typing your content...";
+.editor-rich-text[contenteditable='true']:empty:before {
+    content: 'Start typing your content...';
     color: #6c757d;
     font-style: italic;
 }
@@ -306,12 +308,14 @@ body {
 /* Inline suggestion styles */
 .inline-suggestion-text {
     /* Inherit exact same font properties as editor */
-    font-family: 'JetBrains Mono', 'Fira Code', 'Source Code Pro', 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-family:
+        'JetBrains Mono', 'Fira Code', 'Source Code Pro', 'Consolas', 'Monaco', 'Courier New',
+        monospace;
     font-size: 16px;
     line-height: 1.5;
     font-weight: 400;
     letter-spacing: 0;
-    
+
     /* Suggestion-specific styling */
     color: #9ca3af !important;
     font-style: italic;
@@ -326,12 +330,12 @@ body {
     border: none !important;
     background: transparent !important;
     text-decoration: none !important;
-    
+
     /* Ensure no additional spacing/margin */
     margin: 0;
     padding: 0;
     vertical-align: baseline;
-    
+
     /* Force override any inherited styles */
     box-shadow: none !important;
     border-bottom: none !important;
@@ -419,7 +423,9 @@ body {
 /* Old spell-error styles removed - now using .word-token.spell-error above */
 
 .spell-suggestions {
-    font-family: 'JetBrains Mono', 'Fira Code', 'Source Code Pro', 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-family:
+        'JetBrains Mono', 'Fira Code', 'Source Code Pro', 'Consolas', 'Monaco', 'Courier New',
+        monospace;
     font-size: 14px;
     line-height: 1.4;
     background: white;
@@ -594,12 +600,12 @@ body {
     .sidebar {
         min-height: auto;
     }
-    
+
     .editor-container {
         height: auto;
         min-height: 60vh;
     }
-    
+
     .dashboard-content {
         padding: 20px;
     }
