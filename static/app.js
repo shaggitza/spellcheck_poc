@@ -428,12 +428,14 @@ class TextEditor {
         // Modal close handlers
         const modalCloseBtn = this.utils.queryElement('.btn-close');
         const modalCloseFooterBtn = this.utils.queryElement('#settingsModal .btn-secondary');
-        
+
         if (modalCloseBtn) {
             this.addEventListenerSafe(modalCloseBtn, 'click', () => this.closeSettingsModal());
         }
         if (modalCloseFooterBtn) {
-            this.addEventListenerSafe(modalCloseFooterBtn, 'click', () => this.closeSettingsModal());
+            this.addEventListenerSafe(modalCloseFooterBtn, 'click', () =>
+                this.closeSettingsModal()
+            );
         }
 
         // Feature toggle buttons
@@ -1768,13 +1770,13 @@ class TextEditor {
             this.settingsModal.classList.add('show');
             this.settingsModal.style.display = 'block';
             document.body.classList.add('modal-open');
-            
+
             // Add backdrop
             const backdrop = document.createElement('div');
             backdrop.className = 'modal-backdrop fade show';
             backdrop.id = 'settings-modal-backdrop';
             document.body.appendChild(backdrop);
-            
+
             console.log('Showing modal without Bootstrap');
         }
     }
@@ -1790,7 +1792,7 @@ class TextEditor {
             this.settingsModal.classList.remove('show');
             this.settingsModal.style.display = 'none';
             document.body.classList.remove('modal-open');
-            
+
             // Remove backdrop
             const backdrop = document.getElementById('settings-modal-backdrop');
             if (backdrop) {
@@ -1915,13 +1917,13 @@ class TextEditor {
         try {
             console.log('Loading prediction engines...');
             console.log('predictionEngineSelect element:', this.predictionEngineSelect);
-            
+
             const response = await fetch('/api/prediction-engines');
             const data = await response.json();
 
             if (data.engines && this.predictionEngineSelect) {
                 console.log('Engines data:', data.engines);
-                
+
                 // Clear existing options
                 this.predictionEngineSelect.innerHTML = '';
 
