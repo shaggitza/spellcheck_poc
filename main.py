@@ -13,7 +13,8 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from spellchecker import SpellChecker
-from prediction_engines import get_prediction_engine, PREDICTION_ENGINES
+
+from prediction_engines import PREDICTION_ENGINES, get_prediction_engine
 
 try:
     import hunspell
@@ -376,13 +377,13 @@ async def predict_next_tokens_structured(
     # Get user's preferred prediction engine
     engine_setting = await get_user_setting("prediction_engine", "mock_ai")
     prediction_enabled = await get_user_setting("prediction_enabled", "true")
-    
+
     # Check if prediction is disabled
     if prediction_enabled.lower() != "true":
         return ""
-    
+
     print(f"DEBUG: Using prediction engine: {engine_setting}")
-    
+
     # Route to appropriate engine
     if engine_setting in PREDICTION_ENGINES:
         # Use one of the traditional engines
@@ -395,7 +396,7 @@ async def predict_next_tokens_structured(
             print(f"Error with {engine_setting} engine: {e}")
             # Fall back to mock AI
             engine_setting = "mock_ai"
-    
+
     # Use mock AI engine (original implementation)
     await asyncio.sleep(0.1)  # Simulate processing time
 
@@ -532,20 +533,20 @@ async def get_available_prediction_engines():
         "mock_ai": {
             "name": "Mock AI",
             "description": "Original pattern-based prediction with simulated AI responses",
-            "type": "pattern-based"
+            "type": "pattern-based",
         },
         "traditional": {
             "name": "Traditional Statistical",
             "description": "Statistical prediction using bigrams, trigrams, and frequency analysis",
-            "type": "statistical"
+            "type": "statistical",
         },
         "frequency": {
             "name": "Frequency-Based",
             "description": "Adaptive prediction that learns from text patterns and word frequencies",
-            "type": "adaptive"
-        }
+            "type": "adaptive",
+        },
     }
-    
+
     return {"engines": engines}
 
 
