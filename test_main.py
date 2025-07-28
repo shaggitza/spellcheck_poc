@@ -23,13 +23,29 @@ async def test_predict_next_tokens_structured():
     """Test the structured prediction function."""
     import main
 
-    # Test basic prediction
-    result = await main.predict_next_tokens_structured(
-        prev_context="", current_text="hello ", after_context="", cursor=6, metadata={}
-    )
+    # Mock database settings to avoid real database dependency
+    with patch("main.get_user_setting") as mock_get_setting:
+        # Configure mock to return default values for settings
+        async def mock_setting_side_effect(setting_key, default_value=None):
+            if setting_key == "prediction_engine":
+                return "mock_ai"
+            elif setting_key == "prediction_enabled":
+                return "true"
+            return default_value
 
-    assert isinstance(result, str)
-    assert len(result) > 0
+        mock_get_setting.side_effect = mock_setting_side_effect
+
+        # Test basic prediction
+        result = await main.predict_next_tokens_structured(
+            prev_context="", current_text="hello ", after_context="", cursor=6, metadata={}
+        )
+
+        assert isinstance(result, str)
+        assert len(result) > 0
+        
+        # Verify that settings were queried
+        mock_get_setting.assert_any_call("prediction_engine", "mock_ai")
+        mock_get_setting.assert_any_call("prediction_enabled", "true")
 
 
 @pytest.mark.asyncio
