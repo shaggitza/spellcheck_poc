@@ -378,6 +378,7 @@ async def predict_next_tokens_structured(
     engine_setting = await get_user_setting("prediction_engine", "mock_ai")
     prediction_enabled = await get_user_setting("prediction_enabled", "true")
 
+    assert prediction_enabled is not None, "Prediction enabled setting must be defined"
     # Check if prediction is disabled
     if prediction_enabled.lower() != "true":
         return ""

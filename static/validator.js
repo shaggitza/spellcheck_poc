@@ -114,6 +114,14 @@ class Validator {
                 min: 1,
                 integer: true,
             },
+
+            // String validation rule
+            string: {
+                type: 'string',
+                minLength: 1,
+                maxLength: 1000, // Default max length for strings
+                allowEmptyString: false,
+            },
         };
     }
 
