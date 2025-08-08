@@ -628,4 +628,104 @@ describe('FileManager', () => {
             );
         });
     });
+
+    describe('Dashboard Mode Integration', () => {
+        beforeEach(() => {
+            // Mock window.location for URLSearchParams
+            global.window = {
+                location: {
+                    search: ''
+                }
+            };
+        });
+
+        test('should call environment.isDashboardMode() method successfully', async () => {
+            // Mock window.location.search with no parameters
+            global.window.location.search = '';
+            
+            // Mock fetch to return files
+            global.fetch = jest.fn().mockResolvedValue({
+                json: () => Promise.resolve({ files: [{ name: 'test.txt' }] })
+            });
+
+            // Mock environment.isDashboardMode to return true (dashboard mode)
+            mockDependencies.environment.isDashboardMode.mockReturnValue(true);
+            
+            // Mock utils.getStorageItem to return a last opened file
+            mockDependencies.utils.getStorageItem.mockReturnValue('test.txt');
+
+            await fileManager.loadFileList();
+
+            // Verify that isDashboardMode was called during handleInitialFileSelection
+            expect(mockDependencies.environment.isDashboardMode).toHaveBeenCalled();
+            
+            // In dashboard mode, should not auto-load file
+            expect(fileManager.currentFile).toBeNull();
+        });
+
+        test('should auto-load last file when not in dashboard mode', async () => {
+            // Mock window.location.search with no parameters
+            global.window.location.search = '';
+            
+            // Mock fetch to return files
+            global.fetch = jest.fn()
+                .mockResolvedValueOnce({
+                    json: () => Promise.resolve({ files: [{ name: 'last-file.txt' }] })
+                })
+                .mockResolvedValueOnce({
+                    json: () => Promise.resolve({ content: 'Last file content' })
+                });
+
+            // Mock environment.isDashboardMode to return false (not dashboard mode)
+            mockDependencies.environment.isDashboardMode.mockReturnValue(false);
+            
+            // Mock utils.getStorageItem to return a last opened file
+            mockDependencies.utils.getStorageItem.mockReturnValue('last-file.txt');
+
+            // Mock the abort controller with a simple object
+            mockDependencies.getAbortController.mockReturnValue({ 
+                signal: { aborted: false } 
+            });
+
+            await fileManager.loadFileList();
+
+            // Verify that isDashboardMode was called
+            expect(mockDependencies.environment.isDashboardMode).toHaveBeenCalled();
+            
+            // Not in dashboard mode, should auto-load last file
+            expect(fileManager.currentFile).toBe('last-file.txt');
+            expect(mockDependencies.setEditorContent).toHaveBeenCalledWith('Last file content');
+        });
+
+        test('should not call isDashboardMode when URL has file parameter', async () => {
+            // Mock window.location.search with file parameter
+            global.window.location.search = '?file=url-file.txt';
+            
+            // Mock fetch to return files
+            global.fetch = jest.fn()
+                .mockResolvedValueOnce({
+                    json: () => Promise.resolve({ files: [{ name: 'url-file.txt' }] })
+                })
+                .mockResolvedValueOnce({
+                    json: () => Promise.resolve({ content: 'URL file content' })
+                });
+
+            // Mock utils.getStorageItem to return a different file
+            mockDependencies.utils.getStorageItem.mockReturnValue('last-file.txt');
+
+            // Mock the abort controller
+            mockDependencies.getAbortController.mockReturnValue({ 
+                signal: { aborted: false } 
+            });
+
+            await fileManager.loadFileList();
+
+            // Should NOT call isDashboardMode since URL has file parameter
+            expect(mockDependencies.environment.isDashboardMode).not.toHaveBeenCalled();
+            
+            // Should load URL file instead
+            expect(fileManager.currentFile).toBe('url-file.txt');
+            expect(mockDependencies.setEditorContent).toHaveBeenCalledWith('URL file content');
+        });
+    });
 });
