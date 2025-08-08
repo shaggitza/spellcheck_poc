@@ -9,6 +9,9 @@ RUN apt-get update && apt-get install -y \
     curl \
     hunspell \
     hunspell-en-us \
+    git \
+    libhunspell-dev \
+    build-essential \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy Python requirements and install dependencies
@@ -29,4 +32,4 @@ ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 
 # Default command
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
