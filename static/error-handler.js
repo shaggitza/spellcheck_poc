@@ -317,6 +317,31 @@ class ErrorHandler {
         setTimeout(() => this.removeNotification(notification), 3000);
     }
 
+    showNotification(message, type = 'info') {
+        if (!this.notificationContainer) {
+            this.initializeNotificationContainer();
+        }
+
+        const notification = document.createElement('div');
+        notification.className = `notification ${type}`;
+        notification.textContent = message;
+        notification.style.cssText = `
+            background-color: ${type === 'error' ? 'red' : type === 'warning' ? 'orange' : 'green'};
+            color: white;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            pointer-events: auto;
+        `;
+
+        this.notificationContainer.appendChild(notification);
+
+        setTimeout(() => {
+            notification.remove();
+        }, 3000);
+    }
+
     trackError(error) {
         // Placeholder for analytics tracking
         if (CONFIG.DEBUG.ENABLE_PERFORMANCE_MONITORING) {

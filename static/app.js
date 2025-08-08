@@ -262,6 +262,7 @@ class TextEditor {
         this.spellCheckerEngine = this.utils.queryElement('#spellCheckerEngine');
         this.spellCheckerLanguage = this.utils.queryElement('#spellCheckerLanguage');
         this.spellCheckEnabledInput = this.utils.queryElement('#spellCheckEnabled');
+        this.predictionEngineSelect = this.utils.queryElement('#predictionEngine');
         this.predictionEnabledInput = this.utils.queryElement('#predictionEnabled');
         this.saveSettingsBtn = this.utils.queryElement('#saveSettingsBtn');
 
@@ -422,6 +423,19 @@ class TextEditor {
         // Settings management
         if (this.saveSettingsBtn) {
             this.addEventListenerSafe(this.saveSettingsBtn, 'click', () => this.saveSettings());
+        }
+
+        // Modal close handlers
+        const modalCloseBtn = this.utils.queryElement('.btn-close');
+        const modalCloseFooterBtn = this.utils.queryElement('#settingsModal .btn-secondary');
+
+        if (modalCloseBtn) {
+            this.addEventListenerSafe(modalCloseBtn, 'click', () => this.closeSettingsModal());
+        }
+        if (modalCloseFooterBtn) {
+            this.addEventListenerSafe(modalCloseFooterBtn, 'click', () =>
+                this.closeSettingsModal()
+            );
         }
 
         // Feature toggle buttons
@@ -1742,13 +1756,49 @@ class TextEditor {
     // === SETTINGS AND DICTIONARY MANAGEMENT ===
 
     showSettingsModal() {
-        // Load dictionary words and settings when opening modal
+        // Load dictionary words, settings, and prediction engines when opening modal
         this.loadDictionaryWords();
         this.loadSettings();
+        this.loadPredictionEngines();
 
-        // Show the modal using Bootstrap
-        const modal = new bootstrap.Modal(this.settingsModal);
-        modal.show();
+        // Show the modal - check if Bootstrap is available
+        if (typeof bootstrap !== 'undefined') {
+            const modal = new bootstrap.Modal(this.settingsModal);
+            modal.show();
+        } else {
+            // Fallback: show modal directly by manipulating classes
+            this.settingsModal.classList.add('show');
+            this.settingsModal.style.display = 'block';
+            document.body.classList.add('modal-open');
+
+            // Add backdrop
+            const backdrop = document.createElement('div');
+            backdrop.className = 'modal-backdrop fade show';
+            backdrop.id = 'settings-modal-backdrop';
+            document.body.appendChild(backdrop);
+
+            console.log('Showing modal without Bootstrap');
+        }
+    }
+
+    closeSettingsModal() {
+        if (typeof bootstrap !== 'undefined') {
+            const modalElement = bootstrap.Modal.getInstance(this.settingsModal);
+            if (modalElement) {
+                modalElement.hide();
+            }
+        } else {
+            // Fallback: hide modal directly
+            this.settingsModal.classList.remove('show');
+            this.settingsModal.style.display = 'none';
+            document.body.classList.remove('modal-open');
+
+            // Remove backdrop
+            const backdrop = document.getElementById('settings-modal-backdrop');
+            if (backdrop) {
+                backdrop.remove();
+            }
+        }
     }
 
     async loadDictionaryWords() {
@@ -1863,6 +1913,58 @@ class TextEditor {
         }
     }
 
+    async loadPredictionEngines() {
+        try {
+            console.log('Loading prediction engines...');
+            console.log('predictionEngineSelect element:', this.predictionEngineSelect);
+
+            const response = await fetch('/api/prediction-engines');
+            const data = await response.json();
+
+            if (data.engines && this.predictionEngineSelect) {
+                console.log('Engines data:', data.engines);
+
+                // Clear existing options
+                this.predictionEngineSelect.innerHTML = '';
+
+                // Add engine options
+                Object.entries(data.engines).forEach(([key, engine]) => {
+                    const option = document.createElement('option');
+                    option.value = key;
+                    option.textContent = engine.name;
+                    this.predictionEngineSelect.appendChild(option);
+                    console.log(`Added option: ${key} - ${engine.name}`);
+                });
+
+                // Set up change handler for description updates
+                this.predictionEngineSelect.addEventListener('change', () => {
+                    this.updatePredictionEngineDescription(data.engines);
+                });
+
+                // Initial description update
+                this.updatePredictionEngineDescription(data.engines);
+
+                console.log('✅ Prediction engines loaded');
+            } else {
+                console.error('Failed to load engines - missing data or element');
+                console.log('data.engines:', data.engines);
+                console.log('this.predictionEngineSelect:', this.predictionEngineSelect);
+            }
+        } catch (error) {
+            console.error('Failed to load prediction engines:', error);
+        }
+    }
+
+    updatePredictionEngineDescription(engines) {
+        const descriptionElement = document.getElementById('predictionEngineDescription');
+        if (descriptionElement && this.predictionEngineSelect) {
+            const selectedEngine = engines[this.predictionEngineSelect.value];
+            if (selectedEngine) {
+                descriptionElement.textContent = selectedEngine.description;
+            }
+        }
+    }
+
     // === SETTINGS MANAGEMENT ===
 
     async loadSettings() {
@@ -1880,6 +1982,10 @@ class TextEditor {
 
                 if (this.spellCheckerLanguage && settings.spell_checker_language) {
                     this.spellCheckerLanguage.value = settings.spell_checker_language;
+                }
+
+                if (this.predictionEngineSelect && settings.prediction_engine) {
+                    this.predictionEngineSelect.value = settings.prediction_engine;
                 }
 
                 if (
@@ -1942,6 +2048,10 @@ class TextEditor {
                 settings.spell_checker_language = this.spellCheckerLanguage.value;
             }
 
+            if (this.predictionEngineSelect) {
+                settings.prediction_engine = this.predictionEngineSelect.value;
+            }
+
             if (this.spellCheckEnabledInput) {
                 settings.spell_check_enabled = this.spellCheckEnabledInput.checked;
                 this.spellCheckingEnabled = this.spellCheckEnabledInput.checked;
@@ -1959,6 +2069,9 @@ class TextEditor {
             }
             if (settings.spell_checker_language !== undefined) {
                 validationRules.spell_checker_language = 'spellCheckLanguage';
+            }
+            if (settings.prediction_engine !== undefined) {
+                validationRules.prediction_engine = 'string';
             }
             if (settings.spell_check_enabled !== undefined) {
                 validationRules.spell_check_enabled = 'boolean';

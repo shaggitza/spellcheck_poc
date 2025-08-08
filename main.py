@@ -14,6 +14,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from spellchecker import SpellChecker
 
+from prediction_engines import PREDICTION_ENGINES, get_prediction_engine
+
 try:
     import hunspell
 
@@ -122,7 +124,9 @@ async def init_database():
                 ('spell_checker_engine', 'pyspellchecker', 'string'),
                 ('spell_checker_language', 'en', 'string'),
                 ('spell_suggestions_count', '15', 'integer'),
-                ('spell_check_enabled', 'true', 'boolean')
+                ('spell_check_enabled', 'true', 'boolean'),
+                ('prediction_engine', 'mock_ai', 'string'),
+                ('prediction_enabled', 'true', 'boolean')
         """
         )
 
@@ -367,8 +371,34 @@ async def predict_next_tokens_structured(
     prev_context: str, current_text: str, after_context: str, cursor: int, metadata: dict = {}
 ) -> str:
     """
-    Structured implementation of next token prediction using separated context
+    Structured implementation of next token prediction using separated context.
+    Routes to different prediction engines based on user settings.
     """
+    # Get user's preferred prediction engine
+    engine_setting = await get_user_setting("prediction_engine", "mock_ai")
+    prediction_enabled = await get_user_setting("prediction_enabled", "true")
+
+    assert prediction_enabled is not None, "Prediction enabled setting must be defined"
+    # Check if prediction is disabled
+    if prediction_enabled.lower() != "true":
+        return ""
+
+    print(f"DEBUG: Using prediction engine: {engine_setting}")
+
+    # Route to appropriate engine
+    if engine_setting in PREDICTION_ENGINES:
+        # Use one of the traditional engines
+        try:
+            engine = await get_prediction_engine(engine_setting)
+            return await engine.predict_next_tokens(
+                prev_context, current_text, after_context, cursor, metadata
+            )
+        except Exception as e:
+            print(f"Error with {engine_setting} engine: {e}")
+            # Fall back to mock AI
+            engine_setting = "mock_ai"
+
+    # Use mock AI engine (original implementation)
     await asyncio.sleep(0.1)  # Simulate processing time
 
     # Get text before cursor within the current paragraph
@@ -376,7 +406,7 @@ async def predict_next_tokens_structured(
     # Get text after cursor within the current paragraph
     text_after_cursor = current_text[cursor:] if cursor < len(current_text) else ""
 
-    print("DEBUG Backend Structured:")
+    print("DEBUG Backend Mock AI:")
     print(f"  prev_context: '{prev_context[:50]}{'...' if len(prev_context) > 50 else ''}'")
     print(f"  current_text: '{current_text[:50]}{'...' if len(current_text) > 50 else ''}'")
     print(f"  after_context: '{after_context[:50]}{'...' if len(after_context) > 50 else ''}'")
@@ -387,9 +417,6 @@ async def predict_next_tokens_structured(
         print(
             f"  metadata: paragraph_index={metadata.get('paragraph_index')}, total_paragraphs={metadata.get('total_paragraphs')}"
         )
-
-    # Simple mock predictions based on current text context
-    text_lower = text_before_cursor.lower()
 
     # Check for empty cursor position or newlines
     if not text_before_cursor or text_before_cursor.endswith("\n"):
@@ -404,6 +431,7 @@ async def predict_next_tokens_structured(
     space_suffix = " " if needs_space_suffix else ""
 
     # More flexible pattern matching based on current paragraph context
+    text_lower = text_before_cursor.lower()
     prediction = ""
     if text_lower.endswith("the "):
         prediction = "quick brown fox jumps over the lazy dog"
@@ -499,6 +527,30 @@ async def get_settings():
         return {"error": str(e)}, 500
 
 
+@app.get("/api/prediction-engines")
+async def get_available_prediction_engines():
+    """Get list of available prediction engines"""
+    engines = {
+        "mock_ai": {
+            "name": "Mock AI",
+            "description": "Original pattern-based prediction with simulated AI responses",
+            "type": "pattern-based",
+        },
+        "traditional": {
+            "name": "Traditional Statistical",
+            "description": "Statistical prediction using bigrams, trigrams, and frequency analysis",
+            "type": "statistical",
+        },
+        "frequency": {
+            "name": "Frequency-Based",
+            "description": "Adaptive prediction that learns from text patterns and word frequencies",
+            "type": "adaptive",
+        },
+    }
+
+    return {"engines": engines}
+
+
 @app.post("/api/settings")
 async def update_settings(request: Request):
     """Update user settings"""
@@ -535,6 +587,10 @@ async def update_settings(request: Request):
                 await db.execute("DELETE FROM spell_cache")
                 await db.commit()
                 print("✅ Cleared spell check cache due to engine change")
+
+        # Log prediction engine change (no cache to clear for predictions)
+        if "prediction_engine" in settings:
+            print(f"✅ Changed prediction engine to: {settings['prediction_engine']}")
 
         print(f"✅ Updated {len(settings)} settings")
         return {"success": True, "updated_count": len(settings)}
