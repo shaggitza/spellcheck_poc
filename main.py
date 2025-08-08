@@ -23,6 +23,13 @@ try:
 except ImportError:
     HUNSPELL_AVAILABLE = False
 
+try:
+    from autocorrect import Speller
+
+    AUTOCORRECT_AVAILABLE = True
+except ImportError:
+    AUTOCORRECT_AVAILABLE = False
+
 app = FastAPI(title="Text Editor with Next Token Prediction and Spell Checking")
 
 # Create necessary directories
@@ -33,6 +40,7 @@ os.makedirs("text_files", exist_ok=True)
 # Initialize spell checkers
 pyspell_checker = SpellChecker()
 hunspell_checker = None
+autocorrect_checker = None
 
 # Try to initialize Hunspell with fallback
 if HUNSPELL_AVAILABLE:
@@ -55,6 +63,20 @@ if HUNSPELL_AVAILABLE:
 else:
     print("⚠️  Hunspell not available, using PySpellChecker only")
     hunspell_checker = None
+
+# Try to initialize Autocorrect
+if AUTOCORRECT_AVAILABLE:
+    try:
+        # Use threshold to filter out uncommon words for better spell checking
+        # This helps avoid false positives for internet slang and typos that may be in the dictionary
+        autocorrect_checker = Speller(lang="en", threshold=10000)
+        print("✅ Autocorrect initialized successfully with threshold=10000")
+    except Exception as e:
+        print(f"⚠️  Autocorrect initialization failed: {e}")
+        autocorrect_checker = None
+else:
+    print("⚠️  Autocorrect not available")
+    autocorrect_checker = None
 
 # Database path
 DB_PATH = "spellcheck.db"
@@ -165,6 +187,33 @@ async def spell_check_word_with_engine(
     Check if a word is spelled correctly using the specified engine
     Returns (is_correct, suggestions_list)
     """
+    if engine == "autocorrect" and autocorrect_checker and AUTOCORRECT_AVAILABLE:
+        try:
+            # Use autocorrect's autocorrect_word method to see if word needs correction
+            corrected_word = autocorrect_checker.autocorrect_word(word)
+            
+            if corrected_word.lower() == word.lower():
+                # Word is correct (no change made)
+                return True, []
+            else:
+                # Word was corrected, so original is incorrect
+                # Get multiple suggestions using candidates
+                candidates = autocorrect_checker.get_candidates(word)
+                if candidates:
+                    suggestions = [candidate[1] for candidate in sorted(candidates, key=lambda x: x[0], reverse=True)][:15]
+                    # Make sure corrected word is first in suggestions if not already there
+                    if corrected_word not in suggestions:
+                        suggestions.insert(0, corrected_word)
+                else:
+                    suggestions = [corrected_word]
+                
+                return False, suggestions
+                
+        except Exception as e:
+            print(f"⚠️  Autocorrect error for word '{word}': {e}")
+            # Fallback to PySpellChecker
+            engine = "pyspellchecker"
+    
     if engine == "hunspell" and hunspell_checker and HUNSPELL_AVAILABLE:
         try:
             is_correct = hunspell_checker.spell(word)
@@ -545,6 +594,33 @@ async def get_available_prediction_engines():
             "name": "Frequency-Based",
             "description": "Adaptive prediction that learns from text patterns and word frequencies",
             "type": "adaptive",
+        },
+    }
+
+    return {"engines": engines}
+
+
+@app.get("/api/spellcheck-engines")
+async def get_available_spellcheck_engines():
+    """Get list of available spell checking engines"""
+    engines = {
+        "pyspellchecker": {
+            "name": "PySpellChecker",
+            "description": "Pure Python spell checker using word frequency lists",
+            "type": "statistical",
+            "available": True,
+        },
+        "hunspell": {
+            "name": "Hunspell",
+            "description": "Industry-standard spell checker used by many applications",
+            "type": "morphological",
+            "available": HUNSPELL_AVAILABLE and hunspell_checker is not None,
+        },
+        "autocorrect": {
+            "name": "Autocorrect",
+            "description": "Modern spell corrector with machine learning approach and multi-language support",
+            "type": "statistical",
+            "available": AUTOCORRECT_AVAILABLE and autocorrect_checker is not None,
         },
     }
 
