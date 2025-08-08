@@ -19,7 +19,10 @@ A modern web-based text editor with real-time writing assistance, featuring next
 - **Next-token prediction** for writing continuation suggestions
 - **Context-aware predictions** based on your writing style
 - **Inline suggestions** with Tab to accept, Ctrl+Right for partial acceptance
-- **Spell checking** with real-time error highlighting
+- **Multi-engine spell checking** with real-time error highlighting
+  - PySpellChecker (pure Python, frequency-based)
+  - Hunspell (industry-standard, morphological analysis)
+  - Autocorrect (machine learning approach, multi-language support)
 
 ### 🔄 **Real-time Collaboration Ready**
 
@@ -126,6 +129,47 @@ The system includes intelligent responses for common writing patterns:
 - **Adaptive learning** - The system learns from your writing patterns
 - **Environment-aware** - Behaves differently in development vs. production
 - **Configurable timing** - Suggestion delays and debouncing can be adjusted
+
+## 📝 Spell Checking Features
+
+### Multiple Spell Checking Engines
+
+The application supports three different spell checking engines that can be selected via the settings:
+
+#### **PySpellChecker** (Default)
+- **Type**: Statistical frequency-based
+- **Pros**: Pure Python, no external dependencies, fast
+- **Cons**: Limited to English, basic suggestion quality
+- **Best for**: General purpose spell checking
+
+#### **Hunspell**
+- **Type**: Morphological analysis
+- **Pros**: Industry standard, high accuracy, supports many languages
+- **Cons**: Requires system installation of dictionaries
+- **Best for**: Professional writing, multilingual support
+
+#### **Autocorrect** ⭐ *New*
+- **Type**: Machine learning statistical approach
+- **Pros**: Modern algorithm, excellent suggestion quality, multi-language
+- **Cons**: Requires network for initial dictionary download
+- **Best for**: High-quality corrections with context awareness
+
+### Spell Checking Features
+
+- **Real-time checking** - Errors highlighted as you type
+- **Smart suggestions** - Multiple correction candidates ranked by relevance
+- **Custom dictionary** - Add words to your personal dictionary
+- **Caching system** - Fast performance with intelligent line-based caching
+- **Engine switching** - Change engines without restarting the application
+
+### Configuration
+
+Access spell checking settings via the ⚙️ Settings button:
+
+1. **Engine Selection** - Choose your preferred spell checking engine
+2. **Language Settings** - Configure language preferences (engine-dependent)
+3. **Custom Words** - Manage your personal dictionary
+4. **Suggestion Count** - Control how many suggestions are shown
 
 ## 🔧 Technical Features
 
@@ -283,11 +327,28 @@ spellcheck_poc/
 
 ## 📋 Requirements
 
+### Core Dependencies
+
 - **Python 3.7+**
 - **FastAPI** - Modern web framework
 - **Uvicorn** - ASGI server
 - **WebSocket support** - For real-time communication
 - **Modern web browser** - Chrome, Firefox, Safari, or Edge with JavaScript enabled
+
+### Spell Checking Engines
+
+- **PySpellChecker** - Included by default
+- **Autocorrect** - Automatically installed with `pip install -r requirements.txt`
+- **Hunspell** - Optional, requires system installation:
+  ```bash
+  # Ubuntu/Debian
+  sudo apt-get install libhunspell-dev hunspell-en-us
+  pip install hunspell
+  
+  # macOS
+  brew install hunspell
+  pip install hunspell
+  ```
 
 ## 📄 License
 
