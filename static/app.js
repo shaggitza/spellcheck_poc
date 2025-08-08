@@ -1756,10 +1756,11 @@ class TextEditor {
     // === SETTINGS AND DICTIONARY MANAGEMENT ===
 
     showSettingsModal() {
-        // Load dictionary words, settings, and prediction engines when opening modal
+        // Load dictionary words, settings, and engines when opening modal
         this.loadDictionaryWords();
         this.loadSettings();
         this.loadPredictionEngines();
+        this.loadSpellCheckingEngines();
 
         // Show the modal - check if Bootstrap is available
         if (typeof bootstrap !== 'undefined') {
@@ -1952,6 +1953,59 @@ class TextEditor {
             }
         } catch (error) {
             console.error('Failed to load prediction engines:', error);
+        }
+    }
+
+    async loadSpellCheckingEngines() {
+        try {
+            console.log('Loading spell checking engines...');
+            console.log('spellCheckerEngine element:', this.spellCheckerEngine);
+
+            const response = await fetch('/api/spell-checking-engines');
+            const data = await response.json();
+
+            if (data.engines && this.spellCheckerEngine) {
+                console.log('Spell engines data:', data.engines);
+
+                // Clear existing options
+                this.spellCheckerEngine.innerHTML = '';
+
+                // Add engine options
+                Object.entries(data.engines).forEach(([key, engine]) => {
+                    const option = document.createElement('option');
+                    option.value = key;
+                    option.textContent = engine.available ? engine.name : `${engine.name} (unavailable)`;
+                    option.disabled = !engine.available;
+                    this.spellCheckerEngine.appendChild(option);
+                    console.log(`Added spell option: ${key} - ${engine.name} (${engine.available ? 'available' : 'unavailable'})`);
+                });
+
+                // Set up change handler for description updates
+                this.spellCheckerEngine.addEventListener('change', () => {
+                    this.updateSpellEngineDescription(data.engines);
+                });
+
+                // Initial description update
+                this.updateSpellEngineDescription(data.engines);
+
+                console.log('✅ Spell checking engines loaded');
+            } else {
+                console.error('Failed to load spell engines - missing data or element');
+                console.log('data.engines:', data.engines);
+                console.log('this.spellCheckerEngine:', this.spellCheckerEngine);
+            }
+        } catch (error) {
+            console.error('Failed to load spell checking engines:', error);
+        }
+    }
+
+    updateSpellEngineDescription(engines) {
+        const descriptionElement = document.getElementById('spellEngineDescription');
+        if (descriptionElement && this.spellCheckerEngine) {
+            const selectedEngine = engines[this.spellCheckerEngine.value];
+            if (selectedEngine) {
+                descriptionElement.innerHTML = `${selectedEngine.description}<br><strong>Type:</strong> ${selectedEngine.type}`;
+            }
         }
     }
 

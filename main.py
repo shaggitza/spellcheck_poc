@@ -25,10 +25,6 @@ except ImportError:
 
 # Try to import neuspell
 try:
-    # Set offline mode to avoid network issues during initialization
-    os.environ['TRANSFORMERS_OFFLINE'] = '1'
-    os.environ['HF_HUB_OFFLINE'] = '1'
-    
     from neuspell import SclstmChecker
     NEUSPELL_AVAILABLE = True
     print("✅ Neuspell available")
