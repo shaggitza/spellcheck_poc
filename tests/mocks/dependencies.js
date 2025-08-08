@@ -116,6 +116,7 @@ const createMockErrorHandler = () => ({
 const createMockEnvironment = () => ({
     isDevelopment: jest.fn(() => true),
     isProduction: jest.fn(() => false),
+    isDashboardMode: jest.fn(() => false), // Default to not dashboard mode for tests
     startTimer: jest.fn((name) => ({
         end: jest.fn(() => Math.random() * 100)
     })),
