@@ -23,6 +23,22 @@ try:
 except ImportError:
     HUNSPELL_AVAILABLE = False
 
+# Try to import neuspell
+try:
+    # Set offline mode to avoid network issues during initialization
+    os.environ['TRANSFORMERS_OFFLINE'] = '1'
+    os.environ['HF_HUB_OFFLINE'] = '1'
+    
+    from neuspell import SclstmChecker
+    NEUSPELL_AVAILABLE = True
+    print("✅ Neuspell available")
+except ImportError as e:
+    NEUSPELL_AVAILABLE = False
+    print(f"⚠️  Neuspell not available: {e}")
+except Exception as e:
+    NEUSPELL_AVAILABLE = False
+    print(f"⚠️  Neuspell initialization error: {e}")
+
 app = FastAPI(title="Text Editor with Next Token Prediction and Spell Checking")
 
 # Create necessary directories
@@ -33,6 +49,7 @@ os.makedirs("text_files", exist_ok=True)
 # Initialize spell checkers
 pyspell_checker = SpellChecker()
 hunspell_checker = None
+neuspell_checker = None
 
 # Try to initialize Hunspell with fallback
 if HUNSPELL_AVAILABLE:
@@ -55,6 +72,20 @@ if HUNSPELL_AVAILABLE:
 else:
     print("⚠️  Hunspell not available, using PySpellChecker only")
     hunspell_checker = None
+
+# Try to initialize Neuspell with fallback
+if NEUSPELL_AVAILABLE:
+    try:
+        neuspell_checker = SclstmChecker()
+        print("✅ Neuspell SclstmChecker initialized successfully")
+    except Exception as e:
+        print(f"⚠️  Neuspell SclstmChecker initialization failed: {e}")
+        print("⚠️  This might be due to missing pretrained models or network issues")
+        neuspell_checker = None
+        NEUSPELL_AVAILABLE = False
+else:
+    print("⚠️  Neuspell not available, using other spell checkers")
+    neuspell_checker = None
 
 # Database path
 DB_PATH = "spellcheck.db"
@@ -165,6 +196,33 @@ async def spell_check_word_with_engine(
     Check if a word is spelled correctly using the specified engine
     Returns (is_correct, suggestions_list)
     """
+    if engine == "neuspell" and neuspell_checker and NEUSPELL_AVAILABLE:
+        try:
+            # Neuspell works with full sentences/phrases, not individual words
+            # For single word checking, we'll create a simple sentence context
+            test_sentence = f"The word {word} is used here."
+            corrected = neuspell_checker.correct(test_sentence)
+            
+            # Extract the corrected word from the corrected sentence
+            corrected_words = corrected.split()
+            if len(corrected_words) >= 3:
+                corrected_word = corrected_words[2]  # "The word [CORRECTED_WORD] is..."
+                
+                if corrected_word.lower() != word.lower():
+                    # Word was corrected, so it's misspelled
+                    return False, [corrected_word]
+                else:
+                    # Word was not changed, so it's correct
+                    return True, []
+            else:
+                # Fallback if sentence structure is unexpected
+                return True, []
+                
+        except Exception as e:
+            print(f"⚠️  Neuspell error for word '{word}': {e}")
+            # Fallback to PySpellChecker
+            engine = "pyspellchecker"
+    
     if engine == "hunspell" and hunspell_checker and HUNSPELL_AVAILABLE:
         try:
             is_correct = hunspell_checker.spell(word)
