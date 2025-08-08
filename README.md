@@ -67,6 +67,32 @@ A modern web-based text editor with real-time writing assistance, featuring next
 
 4. **Open your browser** and go to: http://localhost:8000
 
+### Docker Installation (Alternative)
+
+For containerized deployment, use Docker and Docker Compose:
+
+1. **Clone the repository** and navigate to the project directory
+
+2. **Build and start with Docker Compose**:
+
+    ```bash
+    # Development mode (with hot reload)
+    docker compose up --build
+
+    # Production mode
+    docker compose -f docker-compose.prod.yml up --build
+    ```
+
+3. **Open your browser** and go to: http://localhost:8000
+
+**Docker Features:**
+- ✅ **Isolated environment** with all dependencies pre-installed
+- ✅ **Hunspell spell checker** fully configured and working
+- ✅ **Hot reload** in development mode
+- ✅ **Persistent text files** via volume mounts
+- ✅ **Health checks** for monitoring
+- ✅ **Easy deployment** to any Docker-compatible platform
+
 ### First Steps
 
 1. **Dashboard**: Start at the dashboard to see your file overview

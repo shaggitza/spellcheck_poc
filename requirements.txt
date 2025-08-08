@@ -7,3 +7,4 @@ aiosqlite==0.21.0
 pyspellchecker==0.8.3
 neuspell
 protobuf
+hunspell
