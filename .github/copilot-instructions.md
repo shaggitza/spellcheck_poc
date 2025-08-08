@@ -1,36 +1,96 @@
-# Text Editor with Intelligent Writing Assistance
-
-Text Editor with Intelligent Writing Assistance is a Python FastAPI web application with JavaScript frontend that provides real-time AI writing assistance, next-token prediction, spell checking, and intelligent suggestions to enhance writing experience.
+# Text Editor with AI Writing Assistance
 
 Always reference these instructions first and fallback to search or bash commands only when you encounter unexpected information that does not match the info here.
 
+This is a FastAPI-based web application with real-time AI text predictions, spell checking, and intelligent writing assistance. The system uses WebSocket connections for real-time features and supports multiple file management.
+
 ## Working Effectively
 
-Bootstrap, build, and test the repository:
+### Environment Setup
+- **Python 3.12.3** - Confirmed working perfectly
+- **Node.js v20.19.4** - Confirmed working perfectly
+- **Required**: Modern web browser for UI testing
 
-- **Install Python dependencies**:
-  - `pip install -r requirements.txt` -- takes 30 seconds. NEVER CANCEL. Set timeout to 60+ seconds.
-- **Install JavaScript dependencies**: 
-  - `npm install` -- takes 70 seconds. NEVER CANCEL. Set timeout to 120+ seconds.
-- **Validate setup**: `./validate-setup.sh` -- takes 1 second
-- **Run JavaScript tests**: `npm test` -- takes 4 seconds. All 206 tests must pass.
-- **Run JavaScript linting**: `npm run lint` -- takes 1 second
-- **Start the application**: `python main.py` -- starts immediately on http://localhost:8000
-- **Note on Python dev dependencies**: `pip install -r requirements-dev.txt` may timeout due to network issues with PyPI. This is expected - core functionality works without dev dependencies.
+### Bootstrap and Build Process
+```bash
+# Install Python dependencies - NEVER CANCEL, takes ~30 seconds
+pip install -r requirements.txt
+
+# Install Node.js dependencies - NEVER CANCEL, takes 2+ minutes. Set timeout to 180+ seconds.
+npm install
+
+# Validate setup - takes ~1 second
+./validate-setup.sh
+```
+
+**CRITICAL**: Development dependencies (`requirements-dev.txt`) may fail due to network timeouts with safety/bandit packages. This is NOT critical - the application works fully without them.
+
+### Build and Test
+```bash
+# Run JavaScript linting - takes ~1 second  
+npm run lint
+
+# Check code formatting - takes ~1 second
+npm run format:check  
+
+# Run comprehensive test suite - NEVER CANCEL, takes ~5 seconds. Set timeout to 30+ seconds.
+npm test
+
+# Python syntax validation (if dev deps available)
+python -c "import main; print('Backend imports successfully')"
+```
+
+### Run the Application
+```bash
+# Start server - NEVER CANCEL, starts in ~5 seconds. Set timeout to 60+ seconds.
+python main.py
+# OR use the startup script
+./start.sh
+
+# Access at: http://localhost:8000
+```
+
+**Expected startup output:**
+```
+⚠️  Hunspell not available, using PySpellChecker only  
+INFO:     Uvicorn running on http://0.0.0.0:8000
+✅ Spell check database initialized
+```
 
 ## Validation
 
-- ALWAYS manually validate any new code by running the application and testing functionality in the browser.
-- ALWAYS run through complete user scenarios after making changes:
-  1. Create a new text file
-  2. Type text and verify AI predictions appear
-  3. Test spell checking functionality  
-  4. Test file saving and loading
-  5. Test toggle buttons for predictions and spell check
-- The application is fully functional in the browser - you can interact with all UI elements.
-- WebSocket communication works for real-time predictions.
-- ALWAYS run `npm run lint` and fix any linting issues before committing.
-- Python tests (`python -m pytest`) may not work due to missing dev dependencies - this is expected.
+### ALWAYS Test These User Scenarios After Changes
+1. **File Creation Test**:
+   - Navigate to http://localhost:8000
+   - Enter filename ending in `.txt` in sidebar input
+   - Click "Create File" - file should appear in sidebar
+   
+2. **Text Editor Functionality**:
+   - Click on created file to open editor
+   - Type text with intentional spelling errors (e.g., "spellling")
+   - Verify red underlines appear on misspelled words
+   - Verify prediction text appears in "Next tokens:" section
+   
+3. **Real-time Features**:
+   - Confirm WebSocket connection shows "Connection restored"
+   - Type text and verify auto-save ("File saved successfully")
+   - Verify prediction engine provides contextual suggestions
+
+4. **Toggle Features**:
+   - Test 🔮 Predictions and 📝 Spell Check toggle buttons
+   - Verify features can be enabled/disabled independently
+
+### Quality Assurance Commands
+```bash
+# ALWAYS run before committing - takes ~2 seconds total
+npm run lint && npm run format:check
+
+# Run full test suite if making JavaScript changes - takes ~5 seconds  
+npm test
+
+# Validate Python imports if making backend changes
+python -c "import main; print('Backend imports successfully')"
+```
 
 ## Application Architecture
 
@@ -58,17 +118,17 @@ Bootstrap, build, and test the repository:
 ```bash
 # Install dependencies
 pip install -r requirements.txt        # 30s - NEVER CANCEL
-npm install                           # 70s - NEVER CANCEL
+npm install                           # 2+ minutes - NEVER CANCEL
 
 # Validate environment
 ./validate-setup.sh                   # 1s - Quick validation
 
 # Test JavaScript (core functionality)
-npm test                             # 4s - 206 tests must pass
+npm test                             # 5s - 206 tests must pass
 npm run lint                         # 1s - Must pass
 
 # Start application
-python main.py                       # Immediate startup
+python main.py                       # 5s startup
 # Visit: http://localhost:8000
 ```
 
@@ -115,33 +175,31 @@ After making any changes, ALWAYS test these scenarios manually:
 
 ## Common Tasks
 
-The following are outputs from frequently run commands to save time:
+### Repository Structure
+```
+/home/runner/work/spellcheck_poc/spellcheck_poc/
+├── main.py                    # FastAPI backend with WebSocket support
+├── prediction_engines.py     # AI prediction engine implementations  
+├── templates/editor.html      # Main application interface
+├── static/                    # Frontend JavaScript and CSS
+│   ├── app.js                # Main application logic
+│   ├── prediction-engine.js  # Real-time prediction handling
+│   ├── spell-checker.js      # Spell checking implementation
+│   └── *.js                  # Additional modules
+├── text_files/               # User document storage (created at runtime)
+├── tests/                    # JavaScript test suites  
+├── package.json              # Node.js dependencies and scripts
+├── requirements.txt          # Python runtime dependencies
+└── requirements-dev.txt      # Python development dependencies
+```
 
-### Repository structure
-```
-spellcheck_poc/
-├── main.py                    # FastAPI backend
-├── prediction_engines.py     # AI engines  
-├── requirements.txt          # Python dependencies
-├── requirements-dev.txt      # Python dev dependencies
-├── package.json             # Node.js dependencies
-├── start.sh                 # Startup script
-├── validate-setup.sh        # Environment validator
-├── templates/
-│   └── editor.html          # Main UI
-├── static/
-│   ├── app.js              # Main application logic
-│   ├── prediction-engine.js # AI prediction handling
-│   ├── spell-checker.js    # Spell checking
-│   ├── file-manager.js     # File operations
-│   └── style.css           # Styling
-├── tests/
-│   ├── unit/               # JavaScript unit tests
-│   └── integration/        # JavaScript integration tests  
-├── text_files/             # User documents
-└── .github/
-    └── workflows/          # CI pipelines
-```
+### Key Endpoints and APIs
+- `GET /` - Main application interface
+- `GET /api/files` - List user text files
+- `GET /api/files/{filename}` - Get file content
+- `WebSocket /ws` - Real-time predictions and spell checking
+- `GET /api/settings` - User preferences
+- `POST /api/settings` - Save user preferences
 
 ### Key package.json scripts
 ```json
@@ -183,16 +241,18 @@ INFO:     Uvicorn running on http://0.0.0.0:8000
 - **Optional**: Hunspell (falls back to PySpellChecker if unavailable)
 - **Storage**: SQLite database created automatically
 
-## Timing Expectations
+## Timing Expectations - NEVER CANCEL
 
 ### Build Operations
-- Python dependencies: 30 seconds - NEVER CANCEL
-- Node.js dependencies: 70 seconds - NEVER CANCEL  
-- Environment validation: 1 second
-- Application startup: Immediate (< 1 second)
+- **pip install requirements.txt**: ~30 seconds
+- **npm install**: ~2 minutes  
+- **npm test**: ~5 seconds
+- **npm run lint**: ~1 second
+- **Application startup**: ~5 seconds
+- **./validate-setup.sh**: ~1 second
 
 ### Testing Operations
-- JavaScript test suite: 4 seconds (206 tests)
+- JavaScript test suite: 5 seconds (206 tests)
 - JavaScript linting: 1 second
 - Python import validation: < 1 second
 - Manual UI testing: 2-3 minutes for full scenario
@@ -202,13 +262,13 @@ INFO:     Uvicorn running on http://0.0.0.0:8000
 - File changes: Auto-reload in development mode
 - WebSocket reconnection: Automatic with visual indicator
 
-## Error Handling and Known Issues
+## Known Issues and Workarounds
 
 ### Expected Warnings/Issues
-- **Hunspell warning**: "⚠️ Hunspell not available, using PySpellChecker only" - Normal
-- **Dev dependencies timeout**: PyPI network timeouts during `pip install -r requirements-dev.txt` - Expected
-- **CDN blocked resources**: Bootstrap CDN may be blocked in some environments - UI still functions
-- **ESLint deprecation**: .eslintignore deprecated warning - Does not affect functionality
+- **Development dependencies**: `pip install -r requirements-dev.txt` may timeout due to network issues with safety/bandit packages. Not critical for functionality.
+- **Hunspell**: May not be available in all environments. Application gracefully falls back to PySpellChecker.
+- **CDN blocking**: Some CSS resources may be blocked but application functions normally.
+- **ESLint warning**: `.eslintignore` deprecation warning is expected, does not affect functionality.
 
 ### Critical Success Indicators
 - **Application starts**: Server runs on http://localhost:8000
@@ -224,9 +284,14 @@ INFO:     Uvicorn running on http://0.0.0.0:8000
 - **If predictions don't work**: Check browser console for WebSocket errors
 - **If tests fail**: Run `npm test --verbose` for detailed output
 
-## CI/CD Pipeline
+## CI/CD Integration
 
-The repository uses GitHub Actions with workflows in `.github/workflows/`:
+### GitHub Actions
+- **Comprehensive workflows**: in `.github/workflows/`
+- **Frontend testing**: Jest with 206 tests covering UI, spell checking, predictions
+- **Backend testing**: Python tests (requires pytest installation)
+- **Code quality**: ESLint, Prettier for JavaScript; Black, Flake8 for Python
+- **Security scanning**: Bandit, Safety (when available)
 
 ### Main CI Pipeline (`ci.yml`)
 - **Frontend testing**: Node.js 18, ESLint, Prettier, Jest (206 tests)
@@ -253,6 +318,27 @@ All pull requests must pass CI checks. The pipeline mirrors the manual validatio
 - **CPU**: Low usage except during AI prediction requests
 - **Storage**: SQLite database grows with user dictionary additions
 - **Network**: WebSocket connection for real-time features
+
+## Debugging
+
+### Application Logs
+Monitor browser console for detailed debugging:
+- WebSocket connection status
+- Prediction engine requests/responses  
+- Spell checking progress
+- Performance warnings for long tasks
+
+### Network Issues
+If experiencing connectivity issues:
+- Check WebSocket connection in browser console
+- Verify server is running on http://localhost:8000
+- Test basic HTTP endpoints with curl
+
+### Performance Monitoring
+The application includes built-in performance monitoring:
+- Long task detection (>300ms operations)
+- WebSocket timing measurements
+- Spell check and prediction response times
 
 ## Security Considerations
 

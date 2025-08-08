@@ -64,6 +64,36 @@ async def test_spell_check_word_with_engine():
     assert isinstance(suggestions, list)
 
 
+@pytest.mark.asyncio 
+async def test_spell_check_word_with_autocorrect():
+    """Test autocorrect spell checking functionality."""
+    import main
+    
+    # Only run if autocorrect is available
+    if main.AUTOCORRECT_AVAILABLE and main.autocorrect_checker:
+        # Test a correctly spelled word
+        is_correct, suggestions = await main.spell_check_word_with_engine("hello", "autocorrect")
+        assert is_correct is True
+        assert suggestions == []
+
+        # Test a misspelled word that should be corrected
+        is_correct, suggestions = await main.spell_check_word_with_engine("teh", "autocorrect")
+        assert is_correct is False
+        assert isinstance(suggestions, list)
+        assert len(suggestions) > 0
+        # The first suggestion should be "the"
+        assert "the" in suggestions
+        
+        # Test another misspelled word
+        is_correct, suggestions = await main.spell_check_word_with_engine("recieve", "autocorrect")
+        assert is_correct is False
+        assert isinstance(suggestions, list)
+        assert "receive" in suggestions
+    else:
+        # Skip test if autocorrect is not available
+        pytest.skip("Autocorrect library not available")
+
+
 def test_hash_line():
     """Test line hashing function."""
     import main

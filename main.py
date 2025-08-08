@@ -35,6 +35,13 @@ except Exception as e:
     NEUSPELL_AVAILABLE = False
     print(f"⚠️  Neuspell initialization error: {e}")
 
+try:
+    from autocorrect import Speller
+
+    AUTOCORRECT_AVAILABLE = True
+except ImportError:
+    AUTOCORRECT_AVAILABLE = False
+
 app = FastAPI(title="Text Editor with Next Token Prediction and Spell Checking")
 
 # Create necessary directories
@@ -46,6 +53,7 @@ os.makedirs("text_files", exist_ok=True)
 pyspell_checker = SpellChecker()
 hunspell_checker = None
 neuspell_checker = None
+autocorrect_checker = None
 
 # Try to initialize Hunspell with fallback
 if HUNSPELL_AVAILABLE:
@@ -82,6 +90,20 @@ if NEUSPELL_AVAILABLE:
 else:
     print("⚠️  Neuspell not available, using other spell checkers")
     neuspell_checker = None
+
+# Try to initialize Autocorrect
+if AUTOCORRECT_AVAILABLE:
+    try:
+        # Use threshold to filter out uncommon words for better spell checking
+        # This helps avoid false positives for internet slang and typos that may be in the dictionary
+        autocorrect_checker = Speller(lang="en", threshold=10000)
+        print("✅ Autocorrect initialized successfully with threshold=10000")
+    except Exception as e:
+        print(f"⚠️  Autocorrect initialization failed: {e}")
+        autocorrect_checker = None
+else:
+    print("⚠️  Autocorrect not available")
+    autocorrect_checker = None
 
 # Database path
 DB_PATH = "spellcheck.db"
@@ -219,7 +241,40 @@ async def spell_check_word_with_engine(
             # Fallback to PySpellChecker
             engine = "pyspellchecker"
     
-    if engine == "hunspell" and hunspell_checker and HUNSPELL_AVAILABLE:
+    if engine == "autocorrect":
+        if not AUTOCORRECT_AVAILABLE or not autocorrect_checker:
+            # Return error if autocorrect is requested but not available
+            return False, ["Engine not available: autocorrect"]
+        try:
+            # Use autocorrect's autocorrect_word method to see if word needs correction
+            corrected_word = autocorrect_checker.autocorrect_word(word)
+            
+            if corrected_word.lower() == word.lower():
+                # Word is correct (no change made)
+                return True, []
+            else:
+                # Word was corrected, so original is incorrect
+                # Get multiple suggestions using candidates
+                candidates = autocorrect_checker.get_candidates(word)
+                if candidates:
+                    suggestions = [candidate[1] for candidate in sorted(candidates, key=lambda x: x[0], reverse=True)][:15]
+                    # Make sure corrected word is first in suggestions if not already there
+                    if corrected_word not in suggestions:
+                        suggestions.insert(0, corrected_word)
+                else:
+                    suggestions = [corrected_word]
+                
+                return False, suggestions
+                
+        except Exception as e:
+            print(f"⚠️  Autocorrect error for word '{word}': {e}")
+            # Return error instead of falling back
+            return False, [f"Engine error: {str(e)}"]
+    
+    if engine == "hunspell":
+        if not HUNSPELL_AVAILABLE or not hunspell_checker:
+            # Return error if hunspell is requested but not available
+            return False, ["Engine not available: hunspell"]
         try:
             is_correct = hunspell_checker.spell(word)
             if not is_correct:
@@ -228,16 +283,19 @@ async def spell_check_word_with_engine(
             return True, []
         except Exception as e:
             print(f"⚠️  Hunspell error for word '{word}': {e}")
-            # Fallback to PySpellChecker
-            engine = "pyspellchecker"
+            # Return error instead of falling back
+            return False, [f"Engine error: {str(e)}"]
 
-    # Use PySpellChecker (default or fallback)
-    if word.lower() not in pyspell_checker:
-        candidates = pyspell_checker.candidates(word)
-        suggestions = list(candidates)[:15] if candidates else []
-        return False, suggestions
+    # Use PySpellChecker (only if explicitly requested or default)
+    if engine == "pyspellchecker":
+        if word.lower() not in pyspell_checker:
+            candidates = pyspell_checker.candidates(word)
+            suggestions = list(candidates)[:15] if candidates else []
+            return False, suggestions
+        return True, []
 
-    return True, []
+    # If we reach here, the engine is not recognized
+    return False, [f"Unknown engine: {engine}"]
 
 
 def hash_line(line_text: str) -> str:
@@ -629,6 +687,21 @@ async def get_available_spell_checking_engines():
             "name": "Hunspell",
             "description": "Industry-standard spell checker (not available - installation required)",
             "type": "dictionary-based",
+            "available": False,
+        }
+    
+    if AUTOCORRECT_AVAILABLE and autocorrect_checker:
+        engines["autocorrect"] = {
+            "name": "Autocorrect",
+            "description": "Modern spell corrector with machine learning approach and multi-language support",
+            "type": "statistical",
+            "available": True,
+        }
+    else:
+        engines["autocorrect"] = {
+            "name": "Autocorrect",
+            "description": "Modern spell corrector (not available - installation required)",
+            "type": "statistical",
             "available": False,
         }
     

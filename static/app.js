@@ -1756,9 +1756,10 @@ class TextEditor {
     // === SETTINGS AND DICTIONARY MANAGEMENT ===
 
     showSettingsModal() {
-        // Load dictionary words, settings, and engines when opening modal
+        // Load dictionary words, settings, spell check engines, and prediction engines when opening modal
         this.loadDictionaryWords();
         this.loadSettings();
+        this.loadSpellCheckEngines();
         this.loadPredictionEngines();
         this.loadSpellCheckingEngines();
 
@@ -2015,6 +2016,70 @@ class TextEditor {
             const selectedEngine = engines[this.predictionEngineSelect.value];
             if (selectedEngine) {
                 descriptionElement.textContent = selectedEngine.description;
+            }
+        }
+    }
+
+    async loadSpellCheckEngines() {
+        try {
+            console.log('Loading spell check engines...');
+            console.log('spellCheckerEngine element:', this.spellCheckerEngine);
+
+            const response = await fetch('/api/spellcheck-engines');
+            const data = await response.json();
+
+            if (data.engines && this.spellCheckerEngine) {
+                console.log('Spell check engines data:', data.engines);
+
+                // Clear existing options
+                this.spellCheckerEngine.innerHTML = '';
+
+                // Add engine options
+                Object.entries(data.engines).forEach(([key, engine]) => {
+                    const option = document.createElement('option');
+                    option.value = key;
+                    
+                    // Show availability status in option text
+                    if (engine.available) {
+                        option.textContent = engine.name;
+                    } else {
+                        option.textContent = `${engine.name} (Not Available)`;
+                        option.disabled = true;
+                    }
+                    
+                    this.spellCheckerEngine.appendChild(option);
+                    console.log(`Added spell check option: ${key} - ${engine.name} (available: ${engine.available})`);
+                });
+
+                // Set up change handler for description updates
+                this.spellCheckerEngine.addEventListener('change', () => {
+                    this.updateSpellCheckEngineDescription(data.engines);
+                });
+
+                // Initial description update
+                this.updateSpellCheckEngineDescription(data.engines);
+
+                console.log('✅ Spell check engines loaded');
+            } else {
+                console.error('Failed to load spell check engines - missing data or element');
+                console.log('data.engines:', data.engines);
+                console.log('this.spellCheckerEngine:', this.spellCheckerEngine);
+            }
+        } catch (error) {
+            console.error('Failed to load spell check engines:', error);
+        }
+    }
+
+    updateSpellCheckEngineDescription(engines) {
+        const descriptionElement = document.getElementById('engineDescription');
+        if (descriptionElement && this.spellCheckerEngine) {
+            const selectedEngine = engines[this.spellCheckerEngine.value];
+            if (selectedEngine) {
+                const availabilityText = selectedEngine.available ? "✅ Available" : "❌ Not Available";
+                descriptionElement.innerHTML = `
+                    <strong>${selectedEngine.name}:</strong> ${selectedEngine.description}<br>
+                    <span class="badge ${selectedEngine.available ? 'bg-success' : 'bg-warning'} mt-1">${availabilityText}</span>
+                `;
             }
         }
     }
