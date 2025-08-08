@@ -187,7 +187,10 @@ async def spell_check_word_with_engine(
     Check if a word is spelled correctly using the specified engine
     Returns (is_correct, suggestions_list)
     """
-    if engine == "autocorrect" and autocorrect_checker and AUTOCORRECT_AVAILABLE:
+    if engine == "autocorrect":
+        if not AUTOCORRECT_AVAILABLE or not autocorrect_checker:
+            # Return error if autocorrect is requested but not available
+            return False, ["Engine not available: autocorrect"]
         try:
             # Use autocorrect's autocorrect_word method to see if word needs correction
             corrected_word = autocorrect_checker.autocorrect_word(word)
@@ -211,10 +214,13 @@ async def spell_check_word_with_engine(
                 
         except Exception as e:
             print(f"⚠️  Autocorrect error for word '{word}': {e}")
-            # Fallback to PySpellChecker
-            engine = "pyspellchecker"
+            # Return error instead of falling back
+            return False, [f"Engine error: {str(e)}"]
     
-    if engine == "hunspell" and hunspell_checker and HUNSPELL_AVAILABLE:
+    if engine == "hunspell":
+        if not HUNSPELL_AVAILABLE or not hunspell_checker:
+            # Return error if hunspell is requested but not available
+            return False, ["Engine not available: hunspell"]
         try:
             is_correct = hunspell_checker.spell(word)
             if not is_correct:
@@ -223,16 +229,19 @@ async def spell_check_word_with_engine(
             return True, []
         except Exception as e:
             print(f"⚠️  Hunspell error for word '{word}': {e}")
-            # Fallback to PySpellChecker
-            engine = "pyspellchecker"
+            # Return error instead of falling back
+            return False, [f"Engine error: {str(e)}"]
 
-    # Use PySpellChecker (default or fallback)
-    if word.lower() not in pyspell_checker:
-        candidates = pyspell_checker.candidates(word)
-        suggestions = list(candidates)[:15] if candidates else []
-        return False, suggestions
+    # Use PySpellChecker (only if explicitly requested or default)
+    if engine == "pyspellchecker":
+        if word.lower() not in pyspell_checker:
+            candidates = pyspell_checker.candidates(word)
+            suggestions = list(candidates)[:15] if candidates else []
+            return False, suggestions
+        return True, []
 
-    return True, []
+    # If we reach here, the engine is not recognized
+    return False, [f"Unknown engine: {engine}"]
 
 
 def hash_line(line_text: str) -> str:
