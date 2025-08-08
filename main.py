@@ -609,6 +609,51 @@ async def get_available_prediction_engines():
     return {"engines": engines}
 
 
+@app.get("/api/spell-checking-engines") 
+async def get_available_spell_checking_engines():
+    """Get list of available spell checking engines"""
+    engines = {
+        "pyspellchecker": {
+            "name": "PySpellChecker",
+            "description": "Fast and reliable Python spell checker with word suggestions",
+            "type": "dictionary-based",
+            "available": True,
+        }
+    }
+    
+    if HUNSPELL_AVAILABLE and hunspell_checker:
+        engines["hunspell"] = {
+            "name": "Hunspell",
+            "description": "Industry-standard spell checker used in LibreOffice and Firefox",
+            "type": "dictionary-based", 
+            "available": True,
+        }
+    else:
+        engines["hunspell"] = {
+            "name": "Hunspell",
+            "description": "Industry-standard spell checker (not available - installation required)",
+            "type": "dictionary-based",
+            "available": False,
+        }
+    
+    if NEUSPELL_AVAILABLE and neuspell_checker:
+        engines["neuspell"] = {
+            "name": "NeuSpell",
+            "description": "Neural spell checker using deep learning for context-aware corrections",
+            "type": "neural-network",
+            "available": True,
+        }
+    else:
+        engines["neuspell"] = {
+            "name": "NeuSpell", 
+            "description": "Neural spell checker (not available - requires pretrained models)",
+            "type": "neural-network",
+            "available": False,
+        }
+
+    return {"engines": engines}
+
+
 @app.post("/api/settings")
 async def update_settings(request: Request):
     """Update user settings"""
