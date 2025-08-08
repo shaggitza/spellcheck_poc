@@ -369,6 +369,11 @@ class Environment {
         return this.mode === 'production';
     }
 
+    isDashboardMode() {
+        const params = new URLSearchParams(window.location.search);
+        return params.get('view') === 'dashboard' || (!params.get('file') && !params.get('view'));
+    }
+
     getSetting(key) {
         return this.settings[key];
     }
