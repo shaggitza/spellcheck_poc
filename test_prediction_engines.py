@@ -12,7 +12,7 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # flake8: noqa: E402
-from prediction_engines import (
+from backend.engines.prediction_engines import (
     FrequencyBasedPredictor,
     TraditionalPredictionEngine,
     get_prediction_engine,
@@ -21,7 +21,7 @@ from prediction_engines import (
 
 def test_import_prediction_engines():
     """Test that prediction engines can be imported."""
-    from prediction_engines import PREDICTION_ENGINES
+    from backend.engines.prediction_engines import PREDICTION_ENGINES
 
     assert "traditional" in PREDICTION_ENGINES
     assert "frequency" in PREDICTION_ENGINES

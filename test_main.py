@@ -11,7 +11,7 @@ import pytest
 def test_import_main():
     """Test that the main module can be imported successfully."""
     try:
-        import main
+        from backend.api import main
 
         assert main is not None
     except ImportError as e:
