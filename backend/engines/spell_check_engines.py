@@ -136,7 +136,7 @@ class PySpellCheckerEngine(SpellCheckEngine):
             return False
             
     async def check_sentence(self, sentence: str, language: str = "en") -> SpellCheckResult:
-        """Check spelling for an entire sentence using PySpellChecker."""
+        """Check spelling for an entire sentence using PySpellChecker with context-aware processing."""
         if not self.is_engine_available():
             return SpellCheckResult(sentence, [])
             
@@ -146,11 +146,22 @@ class PySpellCheckerEngine(SpellCheckEngine):
         errors = []
         words_with_positions = self._extract_words_with_positions(sentence)
         
+        # Process sentence for context - check for proper nouns and abbreviations
+        sentence_words = [word for word, _, _ in words_with_positions]
+        sentence_context = self._analyze_sentence_context(sentence, sentence_words)
+        
         for word, start_pos, end_pos in words_with_positions:
+            # Skip words that appear to be proper nouns or abbreviations based on context
+            if self._should_skip_word_in_context(word, sentence_context):
+                continue
+                
             if word.lower() not in self.checker:
-                # Word is misspelled, get suggestions
+                # Word is misspelled, get suggestions with context awareness
                 candidates = self.checker.candidates(word)
                 suggestions = list(candidates)[:15] if candidates else []
+                
+                # Filter suggestions based on sentence context
+                suggestions = self._filter_suggestions_by_context(word, suggestions, sentence_context)
                 
                 errors.append({
                     "word": word,
@@ -160,6 +171,48 @@ class PySpellCheckerEngine(SpellCheckEngine):
                 })
                 
         return SpellCheckResult(sentence, errors)
+    
+    def _analyze_sentence_context(self, sentence: str, words: List[str]) -> Dict:
+        """Analyze sentence context to improve spell checking accuracy."""
+        context = {
+            "has_capitalized_words": any(word[0].isupper() and len(word) > 1 for word in words),
+            "sentence_start_index": 0,
+            "sentence_length": len(words),
+            "appears_formal": any(word.lower() in ['mr', 'mrs', 'dr', 'prof', 'inc', 'ltd', 'corp'] for word in words),
+            "has_abbreviations": any(len(word) <= 3 and word.isupper() for word in words),
+            "word_positions": {word.lower(): i for i, word in enumerate(words)}
+        }
+        return context
+    
+    def _should_skip_word_in_context(self, word: str, context: Dict) -> bool:
+        """Determine if a word should be skipped based on sentence context."""
+        # Skip single letters (often abbreviations)
+        if len(word) == 1:
+            return True
+            
+        # Skip words that are all uppercase and short (likely abbreviations)
+        if word.isupper() and len(word) <= 4:
+            return True
+            
+        # Skip words that appear to be proper nouns (capitalized in middle of sentence)
+        word_pos = context['word_positions'].get(word.lower(), -1)
+        if word[0].isupper() and word_pos > 0 and not word.lower() in ['i']:
+            return True
+            
+        return False
+    
+    def _filter_suggestions_by_context(self, word: str, suggestions: List[str], context: Dict) -> List[str]:
+        """Filter and rank suggestions based on sentence context."""
+        if not suggestions:
+            return suggestions
+            
+        # If original word was capitalized, prioritize capitalized suggestions
+        if word[0].isupper():
+            capitalized_suggestions = [s for s in suggestions if s[0].isupper()]
+            lowercase_suggestions = [s.capitalize() for s in suggestions if s[0].islower()]
+            return (capitalized_suggestions + lowercase_suggestions)[:15]
+        
+        return suggestions
         
     def is_engine_available(self) -> bool:
         """Check if PySpellChecker is available."""
@@ -214,7 +267,7 @@ class HunspellEngine(SpellCheckEngine):
             return False
             
     async def check_sentence(self, sentence: str, language: str = "en") -> SpellCheckResult:
-        """Check spelling for an entire sentence using Hunspell."""
+        """Check spelling for an entire sentence using Hunspell with context-aware processing."""
         if not self.is_engine_available():
             return SpellCheckResult(sentence, [])
             
@@ -224,11 +277,22 @@ class HunspellEngine(SpellCheckEngine):
         errors = []
         words_with_positions = self._extract_words_with_positions(sentence)
         
+        # Process sentence for context - check for proper nouns and abbreviations
+        sentence_words = [word for word, _, _ in words_with_positions]
+        sentence_context = self._analyze_sentence_context(sentence, sentence_words)
+        
         for word, start_pos, end_pos in words_with_positions:
+            # Skip words that appear to be proper nouns or abbreviations based on context
+            if self._should_skip_word_in_context(word, sentence_context):
+                continue
+                
             try:
                 if not self.checker.spell(word):
-                    # Word is misspelled, get suggestions
+                    # Word is misspelled, get suggestions with context awareness
                     suggestions = self.checker.suggest(word)[:15]
+                    
+                    # Filter suggestions based on sentence context
+                    suggestions = self._filter_suggestions_by_context(word, suggestions, sentence_context)
                     
                     errors.append({
                         "word": word,
@@ -241,6 +305,48 @@ class HunspellEngine(SpellCheckEngine):
                 continue
                 
         return SpellCheckResult(sentence, errors)
+        
+    def _analyze_sentence_context(self, sentence: str, words: List[str]) -> Dict:
+        """Analyze sentence context to improve spell checking accuracy."""
+        context = {
+            "has_capitalized_words": any(word[0].isupper() and len(word) > 1 for word in words),
+            "sentence_start_index": 0,
+            "sentence_length": len(words),
+            "appears_formal": any(word.lower() in ['mr', 'mrs', 'dr', 'prof', 'inc', 'ltd', 'corp'] for word in words),
+            "has_abbreviations": any(len(word) <= 3 and word.isupper() for word in words),
+            "word_positions": {word.lower(): i for i, word in enumerate(words)}
+        }
+        return context
+    
+    def _should_skip_word_in_context(self, word: str, context: Dict) -> bool:
+        """Determine if a word should be skipped based on sentence context."""
+        # Skip single letters (often abbreviations)
+        if len(word) == 1:
+            return True
+            
+        # Skip words that are all uppercase and short (likely abbreviations)
+        if word.isupper() and len(word) <= 4:
+            return True
+            
+        # Skip words that appear to be proper nouns (capitalized in middle of sentence)
+        word_pos = context['word_positions'].get(word.lower(), -1)
+        if word[0].isupper() and word_pos > 0 and not word.lower() in ['i']:
+            return True
+            
+        return False
+    
+    def _filter_suggestions_by_context(self, word: str, suggestions: List[str], context: Dict) -> List[str]:
+        """Filter and rank suggestions based on sentence context."""
+        if not suggestions:
+            return suggestions
+            
+        # If original word was capitalized, prioritize capitalized suggestions
+        if word[0].isupper():
+            capitalized_suggestions = [s for s in suggestions if s[0].isupper()]
+            lowercase_suggestions = [s.capitalize() for s in suggestions if s[0].islower()]
+            return (capitalized_suggestions + lowercase_suggestions)[:15]
+        
+        return suggestions
         
     def is_engine_available(self) -> bool:
         """Check if Hunspell is available."""
@@ -280,7 +386,7 @@ class AutocorrectEngine(SpellCheckEngine):
             return False
             
     async def check_sentence(self, sentence: str, language: str = "en") -> SpellCheckResult:
-        """Check spelling for an entire sentence using Autocorrect."""
+        """Check spelling for an entire sentence using Autocorrect with context-aware processing."""
         if not self.is_engine_available():
             return SpellCheckResult(sentence, [])
             
@@ -290,7 +396,24 @@ class AutocorrectEngine(SpellCheckEngine):
         errors = []
         words_with_positions = self._extract_words_with_positions(sentence)
         
+        # Process sentence for context - check for proper nouns and abbreviations
+        sentence_words = [word for word, _, _ in words_with_positions]
+        sentence_context = self._analyze_sentence_context(sentence, sentence_words)
+        
+        # Try full sentence correction first (Autocorrect can handle this)
+        try:
+            full_sentence_corrected = self.checker.spell(sentence)
+            if full_sentence_corrected != sentence:
+                # Use sentence-level correction to inform word-level analysis
+                sentence_context['full_correction'] = full_sentence_corrected
+        except Exception:
+            sentence_context['full_correction'] = None
+        
         for word, start_pos, end_pos in words_with_positions:
+            # Skip words that appear to be proper nouns or abbreviations based on context
+            if self._should_skip_word_in_context(word, sentence_context):
+                continue
+                
             try:
                 corrected_word = self.checker.autocorrect_word(word)
                 
@@ -305,6 +428,9 @@ class AutocorrectEngine(SpellCheckEngine):
                     else:
                         suggestions = [corrected_word]
                     
+                    # Filter suggestions based on sentence context
+                    suggestions = self._filter_suggestions_by_context(word, suggestions, sentence_context)
+                    
                     errors.append({
                         "word": word,
                         "start_pos": start_pos,
@@ -316,6 +442,59 @@ class AutocorrectEngine(SpellCheckEngine):
                 continue
                 
         return SpellCheckResult(sentence, errors)
+        
+    def _analyze_sentence_context(self, sentence: str, words: List[str]) -> Dict:
+        """Analyze sentence context to improve spell checking accuracy."""
+        context = {
+            "has_capitalized_words": any(word[0].isupper() and len(word) > 1 for word in words),
+            "sentence_start_index": 0,
+            "sentence_length": len(words),
+            "appears_formal": any(word.lower() in ['mr', 'mrs', 'dr', 'prof', 'inc', 'ltd', 'corp'] for word in words),
+            "has_abbreviations": any(len(word) <= 3 and word.isupper() for word in words),
+            "word_positions": {word.lower(): i for i, word in enumerate(words)}
+        }
+        return context
+    
+    def _should_skip_word_in_context(self, word: str, context: Dict) -> bool:
+        """Determine if a word should be skipped based on sentence context."""
+        # Skip single letters (often abbreviations)
+        if len(word) == 1:
+            return True
+            
+        # Skip words that are all uppercase and short (likely abbreviations)
+        if word.isupper() and len(word) <= 4:
+            return True
+            
+        # Skip words that appear to be proper nouns (capitalized in middle of sentence)
+        word_pos = context['word_positions'].get(word.lower(), -1)
+        if word[0].isupper() and word_pos > 0 and not word.lower() in ['i']:
+            return True
+            
+        return False
+    
+    def _filter_suggestions_by_context(self, word: str, suggestions: List[str], context: Dict) -> List[str]:
+        """Filter and rank suggestions based on sentence context."""
+        if not suggestions:
+            return suggestions
+            
+        # If we have a full sentence correction, prefer suggestions that match it
+        if 'full_correction' in context and context['full_correction']:
+            full_correction_words = context['full_correction'].split()
+            word_pos = context['word_positions'].get(word.lower(), -1)
+            if 0 <= word_pos < len(full_correction_words):
+                sentence_suggestion = full_correction_words[word_pos]
+                if sentence_suggestion in suggestions:
+                    # Move the sentence-level suggestion to the front
+                    suggestions.remove(sentence_suggestion)
+                    suggestions.insert(0, sentence_suggestion)
+            
+        # If original word was capitalized, prioritize capitalized suggestions
+        if word[0].isupper():
+            capitalized_suggestions = [s for s in suggestions if s[0].isupper()]
+            lowercase_suggestions = [s.capitalize() for s in suggestions if s[0].islower()]
+            return (capitalized_suggestions + lowercase_suggestions)[:15]
+        
+        return suggestions
         
     def is_engine_available(self) -> bool:
         """Check if Autocorrect is available."""
@@ -355,7 +534,7 @@ class NeuspellEngine(SpellCheckEngine):
             return False
             
     async def check_sentence(self, sentence: str, language: str = "en") -> SpellCheckResult:
-        """Check spelling for an entire sentence using Neuspell."""
+        """Check spelling for an entire sentence using Neuspell's neural network approach."""
         if not self.is_engine_available():
             return SpellCheckResult(sentence, [])
             
@@ -363,38 +542,126 @@ class NeuspellEngine(SpellCheckEngine):
             return SpellCheckResult(sentence, [])
             
         try:
-            # Neuspell works with full sentences - this is its strength
+            # Neuspell works with full sentences - this is its main strength for context-aware correction
             corrected_sentence = self.checker.correct(sentence)
             
-            # Compare original and corrected sentences to find errors
-            errors = self._compare_sentences(sentence, corrected_sentence)
+            # Compare original and corrected sentences to find errors with improved matching
+            errors = self._compare_sentences_advanced(sentence, corrected_sentence)
             return SpellCheckResult(sentence, errors)
             
         except Exception as e:
             print(f"⚠️  Neuspell error for sentence: {e}")
             return SpellCheckResult(sentence, [])
             
-    def _compare_sentences(self, original: str, corrected: str) -> List[Dict]:
-        """Compare original and corrected sentences to identify errors."""
+    def _compare_sentences_advanced(self, original: str, corrected: str) -> List[Dict]:
+        """Advanced comparison of original and corrected sentences using context."""
         errors = []
         
-        # Simple word-by-word comparison
-        original_words = self._extract_words_with_positions(original)
-        corrected_words = [word for word, _, _ in self._extract_words_with_positions(corrected)]
+        if original.strip() == corrected.strip():
+            return errors  # No corrections needed
         
-        # Match words and find differences
-        for i, (orig_word, start_pos, end_pos) in enumerate(original_words):
-            if i < len(corrected_words):
-                corr_word = corrected_words[i]
+        # Extract words with positions for both sentences
+        original_words = self._extract_words_with_positions(original)
+        corrected_words = self._extract_words_with_positions(corrected)
+        
+        # Create word mappings for better alignment
+        orig_words_only = [word for word, _, _ in original_words]
+        corr_words_only = [word for word, _, _ in corrected_words]
+        
+        # Use sequence alignment to match words correctly
+        alignments = self._align_word_sequences(orig_words_only, corr_words_only)
+        
+        for orig_idx, corr_idx in alignments:
+            if orig_idx >= len(original_words):
+                continue
+                
+            orig_word, start_pos, end_pos = original_words[orig_idx]
+            
+            if corr_idx < len(corr_words_only):
+                corr_word = corr_words_only[corr_idx]
+                
+                # Check if word was actually corrected (not just case change)
                 if orig_word.lower() != corr_word.lower():
                     errors.append({
                         "word": orig_word,
                         "start_pos": start_pos,
                         "end_pos": end_pos,
-                        "suggestions": [corr_word]
+                        "suggestions": [corr_word],
+                        "context_aware": True,  # Mark as context-aware correction
+                        "confidence": "high"  # Neural networks typically have high confidence
                     })
+            else:
+                # Word was removed in correction (very likely an error)
+                errors.append({
+                    "word": orig_word,
+                    "start_pos": start_pos,
+                    "end_pos": end_pos,
+                    "suggestions": [],  # No direct replacement
+                    "context_aware": True,
+                    "confidence": "medium"
+                })
                     
         return errors
+        
+    def _align_word_sequences(self, orig_words: List[str], corr_words: List[str]) -> List[Tuple[int, int]]:
+        """Align original and corrected word sequences for better error detection."""
+        alignments = []
+        orig_idx = 0
+        corr_idx = 0
+        
+        while orig_idx < len(orig_words) and corr_idx < len(corr_words):
+            orig_word = orig_words[orig_idx].lower()
+            corr_word = corr_words[corr_idx].lower()
+            
+            if orig_word == corr_word:
+                # Perfect match, align and continue
+                alignments.append((orig_idx, corr_idx))
+                orig_idx += 1
+                corr_idx += 1
+            elif self._words_similar(orig_word, corr_word):
+                # Similar words (likely a correction), align them
+                alignments.append((orig_idx, corr_idx))
+                orig_idx += 1
+                corr_idx += 1
+            else:
+                # Look ahead for potential matches
+                next_match_orig = self._find_next_match(orig_words[orig_idx:], corr_words[corr_idx:])
+                if next_match_orig >= 0:
+                    # Found a match ahead, align current word anyway
+                    alignments.append((orig_idx, corr_idx))
+                    orig_idx += 1
+                    corr_idx += 1
+                else:
+                    # No clear match, skip the original word (likely needs removal)
+                    alignments.append((orig_idx, -1))
+                    orig_idx += 1
+        
+        # Handle remaining original words
+        while orig_idx < len(orig_words):
+            alignments.append((orig_idx, -1))
+            orig_idx += 1
+            
+        return alignments
+    
+    def _words_similar(self, word1: str, word2: str) -> bool:
+        """Check if two words are similar enough to be considered corrections."""
+        if len(word1) == 0 or len(word2) == 0:
+            return False
+        
+        # Simple edit distance check for similarity
+        max_len = max(len(word1), len(word2))
+        if max_len <= 3:
+            return abs(len(word1) - len(word2)) <= 1
+        else:
+            return abs(len(word1) - len(word2)) <= 2 and word1[:2] == word2[:2]
+    
+    def _find_next_match(self, orig_words: List[str], corr_words: List[str]) -> int:
+        """Find the next matching word in the sequences."""
+        for i, orig_word in enumerate(orig_words[:3]):  # Look ahead 3 words max
+            for j, corr_word in enumerate(corr_words[:3]):
+                if orig_word.lower() == corr_word.lower():
+                    return i
+        return -1
         
     def is_engine_available(self) -> bool:
         """Check if Neuspell is available."""
