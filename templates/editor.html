@@ -124,14 +124,10 @@
                                 <div class="col-md-6">
                                     <label for="spellCheckerEngine" class="form-label">Spell Checker Engine</label>
                                     <select id="spellCheckerEngine" class="form-select">
-                                        <option value="pyspellchecker">PySpellChecker (Default)</option>
-                                        <option value="hunspell">Hunspell</option>
-                                        <option value="autocorrect">Autocorrect (ML-based)</option>
+                                        <!-- Options will be loaded dynamically -->
                                     </select>
-                                    <div class="form-text" id="engineDescription">
-                                        PySpellChecker: Fast, lightweight, pure Python<br>
-                                        Hunspell: Industry standard, morphological analysis<br>
-                                        Autocorrect: Modern ML approach, excellent suggestions
+                                    <div class="form-text" id="spellEngineDescription">
+                                        Loading engine descriptions...
                                     </div>
                                 </div>
                                 <div class="col-md-6">

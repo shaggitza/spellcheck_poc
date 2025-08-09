@@ -23,6 +23,18 @@ try:
 except ImportError:
     HUNSPELL_AVAILABLE = False
 
+# Try to import neuspell
+try:
+    from neuspell import SclstmChecker
+    NEUSPELL_AVAILABLE = True
+    print("✅ Neuspell available")
+except ImportError as e:
+    NEUSPELL_AVAILABLE = False
+    print(f"⚠️  Neuspell not available: {e}")
+except Exception as e:
+    NEUSPELL_AVAILABLE = False
+    print(f"⚠️  Neuspell initialization error: {e}")
+
 try:
     from autocorrect import Speller
 
@@ -40,6 +52,7 @@ os.makedirs("text_files", exist_ok=True)
 # Initialize spell checkers
 pyspell_checker = SpellChecker()
 hunspell_checker = None
+neuspell_checker = None
 autocorrect_checker = None
 
 # Try to initialize Hunspell with fallback
@@ -63,6 +76,20 @@ if HUNSPELL_AVAILABLE:
 else:
     print("⚠️  Hunspell not available, using PySpellChecker only")
     hunspell_checker = None
+
+# Try to initialize Neuspell with fallback
+if NEUSPELL_AVAILABLE:
+    try:
+        neuspell_checker = SclstmChecker()
+        print("✅ Neuspell SclstmChecker initialized successfully")
+    except Exception as e:
+        print(f"⚠️  Neuspell SclstmChecker initialization failed: {e}")
+        print("⚠️  This might be due to missing pretrained models or network issues")
+        neuspell_checker = None
+        NEUSPELL_AVAILABLE = False
+else:
+    print("⚠️  Neuspell not available, using other spell checkers")
+    neuspell_checker = None
 
 # Try to initialize Autocorrect
 if AUTOCORRECT_AVAILABLE:
@@ -187,6 +214,33 @@ async def spell_check_word_with_engine(
     Check if a word is spelled correctly using the specified engine
     Returns (is_correct, suggestions_list)
     """
+    if engine == "neuspell" and neuspell_checker and NEUSPELL_AVAILABLE:
+        try:
+            # Neuspell works with full sentences/phrases, not individual words
+            # For single word checking, we'll create a simple sentence context
+            test_sentence = f"The word {word} is used here."
+            corrected = neuspell_checker.correct(test_sentence)
+            
+            # Extract the corrected word from the corrected sentence
+            corrected_words = corrected.split()
+            if len(corrected_words) >= 3:
+                corrected_word = corrected_words[2]  # "The word [CORRECTED_WORD] is..."
+                
+                if corrected_word.lower() != word.lower():
+                    # Word was corrected, so it's misspelled
+                    return False, [corrected_word]
+                else:
+                    # Word was not changed, so it's correct
+                    return True, []
+            else:
+                # Fallback if sentence structure is unexpected
+                return True, []
+                
+        except Exception as e:
+            print(f"⚠️  Neuspell error for word '{word}': {e}")
+            # Fallback to PySpellChecker
+            engine = "pyspellchecker"
+    
     if engine == "autocorrect":
         if not AUTOCORRECT_AVAILABLE or not autocorrect_checker:
             # Return error if autocorrect is requested but not available
@@ -609,29 +663,62 @@ async def get_available_prediction_engines():
     return {"engines": engines}
 
 
-@app.get("/api/spellcheck-engines")
-async def get_available_spellcheck_engines():
+@app.get("/api/spell-checking-engines") 
+async def get_available_spell_checking_engines():
     """Get list of available spell checking engines"""
     engines = {
         "pyspellchecker": {
             "name": "PySpellChecker",
-            "description": "Pure Python spell checker using word frequency lists",
-            "type": "statistical",
+            "description": "Fast and reliable Python spell checker with word suggestions",
+            "type": "dictionary-based",
             "available": True,
-        },
-        "hunspell": {
+        }
+    }
+    
+    if HUNSPELL_AVAILABLE and hunspell_checker:
+        engines["hunspell"] = {
             "name": "Hunspell",
-            "description": "Industry-standard spell checker used by many applications",
-            "type": "morphological",
-            "available": HUNSPELL_AVAILABLE and hunspell_checker is not None,
-        },
-        "autocorrect": {
+            "description": "Industry-standard spell checker used in LibreOffice and Firefox",
+            "type": "dictionary-based", 
+            "available": True,
+        }
+    else:
+        engines["hunspell"] = {
+            "name": "Hunspell",
+            "description": "Industry-standard spell checker (not available - installation required)",
+            "type": "dictionary-based",
+            "available": False,
+        }
+    
+    if AUTOCORRECT_AVAILABLE and autocorrect_checker:
+        engines["autocorrect"] = {
             "name": "Autocorrect",
             "description": "Modern spell corrector with machine learning approach and multi-language support",
             "type": "statistical",
-            "available": AUTOCORRECT_AVAILABLE and autocorrect_checker is not None,
-        },
-    }
+            "available": True,
+        }
+    else:
+        engines["autocorrect"] = {
+            "name": "Autocorrect",
+            "description": "Modern spell corrector (not available - installation required)",
+            "type": "statistical",
+            "available": False,
+        }
+    
+    if NEUSPELL_AVAILABLE and neuspell_checker:
+        engines["neuspell"] = {
+            "name": "NeuSpell",
+            "description": "Neural spell checker using deep learning for context-aware corrections",
+            "type": "neural-network",
+            "available": True,
+        }
+    else:
+        engines["neuspell"] = {
+            "name": "NeuSpell", 
+            "description": "Neural spell checker (not available - requires pretrained models)",
+            "type": "neural-network",
+            "available": False,
+        }
 
     return {"engines": engines}
 

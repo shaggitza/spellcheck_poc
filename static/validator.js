@@ -85,7 +85,7 @@ class Validator {
             // Settings validation
             spellCheckEngine: {
                 type: 'string',
-                allowedValues: ['pyspellchecker', 'hunspell', 'autocorrect'],
+                allowedValues: ['pyspellchecker', 'hunspell', 'autocorrect', 'neuspell'],
             },
 
             spellCheckLanguage: {
