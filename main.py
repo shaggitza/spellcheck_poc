@@ -12,35 +12,9 @@ from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from spellchecker import SpellChecker
 
 from prediction_engines import PREDICTION_ENGINES, get_prediction_engine
-
-try:
-    import hunspell
-
-    HUNSPELL_AVAILABLE = True
-except ImportError:
-    HUNSPELL_AVAILABLE = False
-
-# Try to import neuspell
-try:
-    from neuspell import SclstmChecker
-    NEUSPELL_AVAILABLE = True
-    print("✅ Neuspell available")
-except ImportError as e:
-    NEUSPELL_AVAILABLE = False
-    print(f"⚠️  Neuspell not available: {e}")
-except Exception as e:
-    NEUSPELL_AVAILABLE = False
-    print(f"⚠️  Neuspell initialization error: {e}")
-
-try:
-    from autocorrect import Speller
-
-    AUTOCORRECT_AVAILABLE = True
-except ImportError:
-    AUTOCORRECT_AVAILABLE = False
+from spell_check_engines import SpellCheckEngineFactory
 
 app = FastAPI(title="Text Editor with Next Token Prediction and Spell Checking")
 
@@ -49,61 +23,8 @@ os.makedirs("static", exist_ok=True)
 os.makedirs("templates", exist_ok=True)
 os.makedirs("text_files", exist_ok=True)
 
-# Initialize spell checkers
-pyspell_checker = SpellChecker()
-hunspell_checker = None
-neuspell_checker = None
-autocorrect_checker = None
-
-# Try to initialize Hunspell with fallback
-if HUNSPELL_AVAILABLE:
-    try:
-        hunspell_checker = hunspell.HunSpell(
-            "/usr/share/hunspell/en_US.dic", "/usr/share/hunspell/en_US.aff"
-        )
-        print("✅ Hunspell initialized successfully")
-    except Exception as e:
-        print(f"⚠️  Hunspell initialization failed: {e}")
-        try:
-            # Try alternative paths
-            hunspell_checker = hunspell.HunSpell(
-                "/usr/share/myspell/en_US.dic", "/usr/share/myspell/en_US.aff"
-            )
-            print("✅ Hunspell initialized with myspell path")
-        except Exception as e2:
-            print(f"⚠️  Hunspell fallback failed: {e2}")
-            hunspell_checker = None
-else:
-    print("⚠️  Hunspell not available, using PySpellChecker only")
-    hunspell_checker = None
-
-# Try to initialize Neuspell with fallback
-if NEUSPELL_AVAILABLE:
-    try:
-        neuspell_checker = SclstmChecker()
-        print("✅ Neuspell SclstmChecker initialized successfully")
-    except Exception as e:
-        print(f"⚠️  Neuspell SclstmChecker initialization failed: {e}")
-        print("⚠️  This might be due to missing pretrained models or network issues")
-        neuspell_checker = None
-        NEUSPELL_AVAILABLE = False
-else:
-    print("⚠️  Neuspell not available, using other spell checkers")
-    neuspell_checker = None
-
-# Try to initialize Autocorrect
-if AUTOCORRECT_AVAILABLE:
-    try:
-        # Use threshold to filter out uncommon words for better spell checking
-        # This helps avoid false positives for internet slang and typos that may be in the dictionary
-        autocorrect_checker = Speller(lang="en", threshold=10000)
-        print("✅ Autocorrect initialized successfully with threshold=10000")
-    except Exception as e:
-        print(f"⚠️  Autocorrect initialization failed: {e}")
-        autocorrect_checker = None
-else:
-    print("⚠️  Autocorrect not available")
-    autocorrect_checker = None
+# Initialize spell checking engine factory
+spell_engine_factory = SpellCheckEngineFactory()
 
 # Database path
 DB_PATH = "spellcheck.db"
@@ -207,97 +128,6 @@ async def set_user_setting(setting_key: str, setting_value: str, setting_type: s
         print(f"✅ Updated setting {setting_key} = {setting_value}")
 
 
-async def spell_check_word_with_engine(
-    word: str, engine: str = "pyspellchecker"
-) -> Tuple[bool, List[str]]:
-    """
-    Check if a word is spelled correctly using the specified engine
-    Returns (is_correct, suggestions_list)
-    """
-    if engine == "neuspell" and neuspell_checker and NEUSPELL_AVAILABLE:
-        try:
-            # Neuspell works with full sentences/phrases, not individual words
-            # For single word checking, we'll create a simple sentence context
-            test_sentence = f"The word {word} is used here."
-            corrected = neuspell_checker.correct(test_sentence)
-            
-            # Extract the corrected word from the corrected sentence
-            corrected_words = corrected.split()
-            if len(corrected_words) >= 3:
-                corrected_word = corrected_words[2]  # "The word [CORRECTED_WORD] is..."
-                
-                if corrected_word.lower() != word.lower():
-                    # Word was corrected, so it's misspelled
-                    return False, [corrected_word]
-                else:
-                    # Word was not changed, so it's correct
-                    return True, []
-            else:
-                # Fallback if sentence structure is unexpected
-                return True, []
-                
-        except Exception as e:
-            print(f"⚠️  Neuspell error for word '{word}': {e}")
-            # Fallback to PySpellChecker
-            engine = "pyspellchecker"
-    
-    if engine == "autocorrect":
-        if not AUTOCORRECT_AVAILABLE or not autocorrect_checker:
-            # Return error if autocorrect is requested but not available
-            return False, ["Engine not available: autocorrect"]
-        try:
-            # Use autocorrect's autocorrect_word method to see if word needs correction
-            corrected_word = autocorrect_checker.autocorrect_word(word)
-            
-            if corrected_word.lower() == word.lower():
-                # Word is correct (no change made)
-                return True, []
-            else:
-                # Word was corrected, so original is incorrect
-                # Get multiple suggestions using candidates
-                candidates = autocorrect_checker.get_candidates(word)
-                if candidates:
-                    suggestions = [candidate[1] for candidate in sorted(candidates, key=lambda x: x[0], reverse=True)][:15]
-                    # Make sure corrected word is first in suggestions if not already there
-                    if corrected_word not in suggestions:
-                        suggestions.insert(0, corrected_word)
-                else:
-                    suggestions = [corrected_word]
-                
-                return False, suggestions
-                
-        except Exception as e:
-            print(f"⚠️  Autocorrect error for word '{word}': {e}")
-            # Return error instead of falling back
-            return False, [f"Engine error: {str(e)}"]
-    
-    if engine == "hunspell":
-        if not HUNSPELL_AVAILABLE or not hunspell_checker:
-            # Return error if hunspell is requested but not available
-            return False, ["Engine not available: hunspell"]
-        try:
-            is_correct = hunspell_checker.spell(word)
-            if not is_correct:
-                suggestions = hunspell_checker.suggest(word)[:15]  # Top 15 suggestions
-                return False, suggestions
-            return True, []
-        except Exception as e:
-            print(f"⚠️  Hunspell error for word '{word}': {e}")
-            # Return error instead of falling back
-            return False, [f"Engine error: {str(e)}"]
-
-    # Use PySpellChecker (only if explicitly requested or default)
-    if engine == "pyspellchecker":
-        if word.lower() not in pyspell_checker:
-            candidates = pyspell_checker.candidates(word)
-            suggestions = list(candidates)[:15] if candidates else []
-            return False, suggestions
-        return True, []
-
-    # If we reach here, the engine is not recognized
-    return False, [f"Unknown engine: {engine}"]
-
-
 def hash_line(line_text: str) -> str:
     """Create a hash for a line of text for caching"""
     return hashlib.sha256(line_text.encode("utf-8")).hexdigest()
@@ -305,16 +135,16 @@ def hash_line(line_text: str) -> str:
 
 async def spell_check_line(line_text: str, language: str = "en") -> List[Dict]:
     """
-    Check spelling for a single line with caching
+    Check spelling for a single line with caching using the new engine interface.
     Returns list of spelling errors with positions
     """
     if not line_text.strip():
         return []
 
     # Get user's preferred spell checking engine
-    engine = await get_user_setting("spell_checker_engine", "pyspellchecker") or "pyspellchecker"
+    engine_name = await get_user_setting("spell_checker_engine", "pyspellchecker") or "pyspellchecker"
 
-    line_hash = hash_line(line_text + f"_{engine}")  # Include engine in hash for cache separation
+    line_hash = hash_line(line_text + f"_{engine_name}")  # Include engine in hash for cache separation
 
     # Check cache first
     async with aiosqlite.connect(DB_PATH) as db:
@@ -337,44 +167,30 @@ async def spell_check_line(line_text: str, language: str = "en") -> List[Dict]:
             else:
                 return []
 
-    # Cache miss - perform spell check
+    # Cache miss - perform spell check using new engine interface
     errors = []
-    words = re.findall(r"\b\w+\b", line_text)
+    
+    # Get the spell check engine
+    engine = await spell_engine_factory.get_engine(engine_name)
+    if not engine or not engine.is_engine_available():
+        print(f"⚠️  Spell check engine '{engine_name}' not available, falling back to pyspellchecker")
+        engine = await spell_engine_factory.get_engine("pyspellchecker")
+        
+    if engine and engine.is_engine_available():
+        # Get user's custom dictionary
+        custom_words = set()
+        async with aiosqlite.connect(DB_PATH) as db:
+            async with db.execute("SELECT word FROM user_dictionary") as cursor:
+                async for row in cursor:
+                    custom_words.add(row[0].lower())
 
-    # Get user's custom dictionary
-    custom_words = set()
-    async with aiosqlite.connect(DB_PATH) as db:
-        async with db.execute("SELECT word FROM user_dictionary") as cursor:
-            async for row in cursor:
-                custom_words.add(row[0].lower())
-
-    # Check each word
-    current_pos = 0
-    for word in words:
-        # Find word position in line
-        word_start = line_text.find(word, current_pos)
-        if word_start == -1:
-            continue
-
-        word_end = word_start + len(word)
-        current_pos = word_end
-
-        # Skip if word is in custom dictionary
-        if word.lower() in custom_words:
-            continue
-
-        # Check if word is misspelled using the selected engine
-        is_correct, suggestions = await spell_check_word_with_engine(word, engine)
-
-        if not is_correct:
-            errors.append(
-                {
-                    "word": word,
-                    "start_pos": word_start,
-                    "end_pos": word_end,
-                    "suggestions": suggestions,
-                }
-            )
+        # Use the engine to check the entire sentence
+        result = await engine.check_sentence(line_text, language)
+        
+        # Filter out words that are in the custom dictionary
+        for error in result.errors:
+            if error["word"].lower() not in custom_words:
+                errors.append(error)
 
     # Cache the results
     async with aiosqlite.connect(DB_PATH) as db:
@@ -388,7 +204,7 @@ async def spell_check_line(line_text: str, language: str = "en") -> List[Dict]:
         )
         await db.commit()
 
-    print(f"DEBUG Spell Check ({engine}): Line '{line_text[:50]}...' -> {len(errors)} errors")
+    print(f"DEBUG Spell Check ({engine_name}): Line '{line_text[:50]}...' -> {len(errors)} errors")
     return errors
 
 
@@ -665,61 +481,8 @@ async def get_available_prediction_engines():
 
 @app.get("/api/spell-checking-engines") 
 async def get_available_spell_checking_engines():
-    """Get list of available spell checking engines"""
-    engines = {
-        "pyspellchecker": {
-            "name": "PySpellChecker",
-            "description": "Fast and reliable Python spell checker with word suggestions",
-            "type": "dictionary-based",
-            "available": True,
-        }
-    }
-    
-    if HUNSPELL_AVAILABLE and hunspell_checker:
-        engines["hunspell"] = {
-            "name": "Hunspell",
-            "description": "Industry-standard spell checker used in LibreOffice and Firefox",
-            "type": "dictionary-based", 
-            "available": True,
-        }
-    else:
-        engines["hunspell"] = {
-            "name": "Hunspell",
-            "description": "Industry-standard spell checker (not available - installation required)",
-            "type": "dictionary-based",
-            "available": False,
-        }
-    
-    if AUTOCORRECT_AVAILABLE and autocorrect_checker:
-        engines["autocorrect"] = {
-            "name": "Autocorrect",
-            "description": "Modern spell corrector with machine learning approach and multi-language support",
-            "type": "statistical",
-            "available": True,
-        }
-    else:
-        engines["autocorrect"] = {
-            "name": "Autocorrect",
-            "description": "Modern spell corrector (not available - installation required)",
-            "type": "statistical",
-            "available": False,
-        }
-    
-    if NEUSPELL_AVAILABLE and neuspell_checker:
-        engines["neuspell"] = {
-            "name": "NeuSpell",
-            "description": "Neural spell checker using deep learning for context-aware corrections",
-            "type": "neural-network",
-            "available": True,
-        }
-    else:
-        engines["neuspell"] = {
-            "name": "NeuSpell", 
-            "description": "Neural spell checker (not available - requires pretrained models)",
-            "type": "neural-network",
-            "available": False,
-        }
-
+    """Get list of available spell checking engines using the new interface"""
+    engines = await spell_engine_factory.get_available_engines()
     return {"engines": engines}
 
 
