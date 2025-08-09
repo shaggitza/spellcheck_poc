@@ -15,6 +15,9 @@ from fastapi.templating import Jinja2Templates
 from spellchecker import SpellChecker
 
 from prediction_engines import PREDICTION_ENGINES, get_prediction_engine
+from event_handlers import event_router
+from spellcheck_handler import SpellcheckEventHandler
+from additional_handlers import PredictionEventHandler, DictionaryEventHandler, HealthCheckEventHandler
 
 try:
     import hunspell
@@ -444,6 +447,21 @@ manager = ConnectionManager()
 @app.on_event("startup")
 async def startup_event():
     await init_database()
+    
+    # Initialize EDA event handlers
+    spellcheck_handler = SpellcheckEventHandler(spell_check_function=spell_check_line)
+    event_router.register_handler(spellcheck_handler)
+    
+    # Register additional event handlers to demonstrate extensibility
+    prediction_handler = PredictionEventHandler(prediction_function=predict_next_tokens_structured)
+    dictionary_handler = DictionaryEventHandler()
+    health_handler = HealthCheckEventHandler()
+    
+    event_router.register_handler(prediction_handler)
+    event_router.register_handler(dictionary_handler)
+    event_router.register_handler(health_handler)
+    
+    print("✅ EDA event handlers initialized")
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -723,6 +741,51 @@ async def get_available_spell_checking_engines():
     return {"engines": engines}
 
 
+@app.get("/api/event-handlers")
+async def get_available_event_handlers():
+    """Get list of available EDA event handlers"""
+    handlers_info = {}
+    
+    for message_key, handler in event_router.handlers.items():
+        handlers_info[message_key] = {
+            "handler_class": handler.__class__.__name__,
+            "message_schema": handler.message_schema.__name__ if hasattr(handler, 'message_schema') else None,
+            "description": f"Event handler for {message_key} messages"
+        }
+    
+    return {
+        "handlers": handlers_info,
+        "total_handlers": len(event_router.handlers),
+        "architecture": "Event-Driven Architecture (EDA)",
+        "websocket_endpoint": "/ws",
+        "usage": {
+            "message_format": "Send JSON with 'message_key' field to route to appropriate handler",
+            "subscription": "Use 'subscribe' type message to subscribe to specific topics",
+            "response_format": "Responses include success status and correlation_id for tracking"
+        }
+    }
+
+
+@app.get("/api/websocket-subscriptions")
+async def get_websocket_subscriptions():
+    """Get current WebSocket subscriptions (for debugging)"""
+    subscriptions = {}
+    
+    for websocket, topics in event_router.subscriptions.items():
+        # Use websocket id for display (can't serialize WebSocket object)
+        ws_id = f"ws_{id(websocket)}"
+        subscriptions[ws_id] = {
+            "topics": topics,
+            "subscription_count": len(topics)
+        }
+    
+    return {
+        "active_subscriptions": subscriptions,
+        "total_connections": len(event_router.subscriptions),
+        "total_topics": sum(len(topics) for topics in event_router.subscriptions.values())
+    }
+
+
 @app.post("/api/settings")
 async def update_settings(request: Request):
     """Update user settings"""
@@ -778,6 +841,25 @@ async def websocket_endpoint(websocket: WebSocket):
             data = await websocket.receive_text()
             message = json.loads(data)
 
+            # Check if this is an EDA-style message with message_key
+            if "message_key" in message:
+                # Route through EDA event system
+                try:
+                    response = await event_router.route_message(message, websocket)
+                    if response:
+                        await manager.send_personal_message(response.model_dump(), websocket)
+                    continue
+                except Exception as eda_error:
+                    print(f"EDA routing error: {str(eda_error)}")
+                    error_response = {
+                        "type": "error",
+                        "message": f"EDA processing failed: {str(eda_error)}",
+                        "correlation_id": message.get("correlation_id")
+                    }
+                    await manager.send_personal_message(error_response, websocket)
+                    continue
+
+            # Backward compatibility: Handle legacy message format
             if message["type"] == "edit":
                 # Handle text editing
                 filename = message["filename"]
@@ -827,24 +909,31 @@ async def websocket_endpoint(websocket: WebSocket):
                 await manager.send_personal_message(response, websocket)
 
             elif message["type"] == "spell_check_request":
-                # Handle spell check requests for lines
+                # Handle legacy spell check requests (backward compatibility)
+                # Convert to EDA format and route through event system
                 lines = message.get("lines", [])
                 language = message.get("language", "en")
-
-                # Check each line for spelling errors
-                all_errors = {}
-                for line_index, line_text in enumerate(lines):
-                    if line_text.strip():  # Only check non-empty lines
-                        errors = await spell_check_line(line_text, language)
-                        if errors:
-                            all_errors[line_index] = errors
-
-                response = {
-                    "type": "spell_check_response",
-                    "errors": all_errors,
+                
+                eda_message = {
+                    "message_key": "spellcheck_request",
+                    "lines": lines,
                     "language": language,
+                    "correlation_id": f"legacy_{hash(str(message))}"
                 }
-                await manager.send_personal_message(response, websocket)
+                
+                try:
+                    response = await event_router.route_message(eda_message, websocket)
+                    if response:
+                        # Convert EDA response back to legacy format
+                        legacy_response = {
+                            "type": "spell_check_response",
+                            "errors": response.errors,
+                            "language": response.language,
+                        }
+                        await manager.send_personal_message(legacy_response, websocket)
+                except Exception as e:
+                    error_response = {"type": "error", "message": f"Spell check failed: {str(e)}"}
+                    await manager.send_personal_message(error_response, websocket)
 
             elif message["type"] == "add_word":
                 # Add word to user's custom dictionary
@@ -855,8 +944,34 @@ async def websocket_endpoint(websocket: WebSocket):
                     response = {"type": "dictionary_updated", "word": word, "success": True}
                     await manager.send_personal_message(response, websocket)
 
+            elif message["type"] == "subscribe":
+                # Handle EDA topic subscriptions
+                topics = message.get("topics", [])
+                await event_router.subscribe(websocket, topics)
+                
+                response = {
+                    "type": "subscription_response",
+                    "subscribed_topics": topics,
+                    "success": True
+                }
+                await manager.send_personal_message(response, websocket)
+
+            elif message["type"] == "unsubscribe":
+                # Handle EDA topic unsubscriptions
+                topics = message.get("topics", None)
+                await event_router.unsubscribe(websocket, topics)
+                
+                response = {
+                    "type": "unsubscription_response", 
+                    "unsubscribed_topics": topics or "all",
+                    "success": True
+                }
+                await manager.send_personal_message(response, websocket)
+
     except WebSocketDisconnect:
         manager.disconnect(websocket)
+        # Clean up EDA subscriptions
+        event_router.disconnect(websocket)
 
 
 if __name__ == "__main__":
